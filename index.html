@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10151B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Alokasi Investasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#10151B; --surface:#191F27; --surface2:#202A36; --border:#2B3542;
+  --text:#E9EDF2; --muted:#8C97A6; --gold:#E4B54A;
+  --idx:#5B8DEF; --etf:#9B7BE4; --sbn:#47BE8A; --depo:#E48A4F; --rdpu:#43B7C9; --emas:#E4B54A;
+  --pos:#47BE8A; --neg:#E4574F;
+  --radius:14px;
+  --font:'Space Grotesk',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--font);
+  font-size:15px; line-height:1.45; min-height:100vh;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom));
+  font-variant-numeric:tabular-nums;
+}
+header.app{padding:18px 18px 6px; display:flex; align-items:baseline; gap:8px}
+header.app h1{font-size:20px; font-weight:700; letter-spacing:.2px}
+header.app span{color:var(--muted); font-size:12.5px}
+main{padding:10px 14px 24px; max-width:560px; margin:0 auto}
+.page{display:none}
+.page.active{display:block; animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+@media (prefers-reduced-motion: reduce){ .page.active{animation:none} }
+
+.card{background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px; margin-bottom:14px}
+.card h2{font-size:13px; font-weight:600; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.8px; margin-bottom:12px}
+.sub{color:var(--muted); font-size:12.5px}
+
+.ringwrap{display:flex; align-items:center; gap:18px}
+.ring{position:relative; width:118px; height:118px; flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .pct{position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center}
+.ring .pct b{font-size:22px; font-weight:700}
+.ring .pct small{color:var(--muted); font-size:10.5px; text-transform:uppercase; letter-spacing:.6px}
+.tstats{flex:1; display:grid; gap:8px}
+.tstats .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.tstats .row .k{color:var(--muted); font-size:12.5px}
+.tstats .row .v{font-weight:600; font-size:13.5px; text-align:right}
+.tstats .row .v.pos{color:var(--pos)} .tstats .row .v.neg{color:var(--neg)}
+
+.arow{padding:11px 0; border-bottom:1px solid var(--border)}
+.arow:last-child{border-bottom:none; padding-bottom:2px}
+.arow .top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px}
+.arow .name{font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px}
+.dot{width:9px; height:9px; border-radius:3px; flex:none}
+.arow .pcts{font-size:13px}
+.arow .pcts b{font-weight:700}
+.arow .pcts span{color:var(--muted)}
+.bars{display:grid; gap:4px}
+.bar{height:8px; background:var(--surface2); border-radius:5px; overflow:hidden}
+.bar i{display:block; height:100%; border-radius:5px; transition:width .4s ease}
+.bar.plan i{opacity:.38}
+.barlabels{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:4px}
+.legendline{display:flex; gap:14px; font-size:11.5px; color:var(--muted); margin-bottom:10px}
+.legendline .sw{display:inline-block; width:16px; height:7px; border-radius:4px; background:var(--muted); vertical-align:middle; margin-right:5px}
+.legendline .sw.faint{opacity:.38}
+
+label.f{display:block; font-size:12.5px; color:var(--muted); margin:12px 0 5px}
+input[type=text], input[type=month], input[type=date], select{
+  width:100%; background:var(--surface2); border:1px solid var(--border);
+  border-radius:10px; color:var(--text); font-family:var(--font);
+  font-size:16px; padding:11px 12px; outline:none; -webkit-appearance:none; appearance:none;
+}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%; background-size:5px 5px; background-repeat:no-repeat}
+input:focus-visible, select:focus-visible, button:focus-visible{outline:2px solid var(--gold); outline-offset:1px}
+.inrow{display:flex; align-items:center; gap:10px}
+.inrow .pre{color:var(--muted); font-size:14px; flex:none}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:0 12px}
+button{font-family:var(--font); font-size:14.5px; font-weight:600;
+  border:1px solid var(--border); border-radius:11px; padding:12px 16px; cursor:pointer;
+  background:var(--surface2); color:var(--text)}
+button.primary{background:var(--gold); color:#1A1508; border-color:var(--gold)}
+button.danger{background:transparent; color:var(--neg); border-color:var(--neg)}
+button.small{padding:8px 12px; font-size:13px; border-radius:9px}
+.btnrow{display:flex; gap:9px; flex-wrap:wrap; margin-top:12px}
+.btnrow button{flex:1; min-width:130px}
+
+.splitrow{display:grid; grid-template-columns:1fr; gap:6px;
+  padding:11px 0; border-bottom:1px solid var(--border)}
+.splitrow:last-of-type{border-bottom:none}
+.splitrow .head{display:flex; justify-content:space-between; align-items:baseline}
+.splitrow .plan{color:var(--muted); font-size:12.5px}
+.sumline{display:flex; justify-content:space-between; padding-top:12px; font-size:13.5px}
+.sumline b.ok{color:var(--pos)} .sumline b.bad{color:var(--neg)}
+.calcline{display:flex; justify-content:space-between; font-size:13px; margin-top:9px}
+.calcline .k{color:var(--muted)}
+.calcline b.pos{color:var(--pos)} .calcline b.neg{color:var(--neg)}
+
+.diffcard{padding:12px 0; border-bottom:1px solid var(--border)}
+.diffcard:last-child{border-bottom:none}
+.diffcard .l1{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px}
+.badge{font-size:11px; font-weight:700; padding:3px 8px; border-radius:20px; letter-spacing:.3px}
+.badge.over{background:rgba(228,87,79,.15); color:var(--neg)}
+.badge.under{background:rgba(91,141,239,.15); color:var(--idx)}
+.badge.ok{background:rgba(71,190,138,.15); color:var(--pos)}
+.badge.aktif{background:rgba(228,138,79,.15); color:var(--depo)}
+.badge.cair{background:rgba(71,190,138,.15); color:var(--pos)}
+.diffcard .nums{display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; font-size:13px}
+.diffcard .nums .k{color:var(--muted); font-size:11.5px}
+.diffcard .action{margin-top:6px; font-size:13px; font-weight:600}
+.action.buy{color:var(--pos)} .action.hold{color:var(--muted)} .action.trim{color:var(--neg)}
+
+.hitem{border-bottom:1px solid var(--border); padding:12px 0}
+.hitem:last-child{border-bottom:none}
+.hitem summary{display:flex; justify-content:space-between; gap:10px; cursor:pointer; list-style:none; font-weight:600}
+.hitem summary::-webkit-details-marker{display:none}
+.hitem summary .l{display:flex; flex-direction:column; gap:1px; min-width:0}
+.hitem summary .l small{color:var(--muted); font-weight:500; font-size:11.5px}
+.hitem summary .r{text-align:right; flex:none}
+.hitem summary .r small{display:block; color:var(--muted); font-weight:500; font-size:11.5px}
+.hitem .detail{margin-top:9px; font-size:13px; display:grid; gap:4px}
+.hitem .detail .r2{display:flex; justify-content:space-between}
+.hitem .detail .r2 span:first-child{color:var(--muted)}
+.empty{color:var(--muted); font-size:13.5px; text-align:center; padding:18px 0}
+.pl-pos{color:var(--pos)} .pl-neg{color:var(--neg)}
+
+.allocgrid{display:grid; grid-template-columns:1fr 92px; gap:9px; align-items:center}
+.allocgrid .an{font-size:14px; display:flex; align-items:center; gap:8px}
+.allocsum{margin-top:10px; font-size:13.5px}
+.allocsum b.ok{color:var(--pos)} .allocsum b.bad{color:var(--neg)}
+.taxgrid{display:grid; grid-template-columns:1fr 92px; gap:9px; align-items:center; font-size:13.5px}
+
+nav.tabs{position:fixed; bottom:0; left:0; right:0; z-index:20;
+  background:rgba(16,21,27,.92); backdrop-filter:blur(10px);
+  border-top:1px solid var(--border); display:flex; padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs button{flex:1; background:none; border:none; border-radius:0; color:var(--muted);
+  font-size:10.5px; font-weight:600; padding:9px 2px 10px;
+  display:flex; flex-direction:column; align-items:center; gap:3px}
+nav.tabs button svg{width:21px; height:21px; stroke:currentColor; fill:none;
+  stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round}
+nav.tabs button.on{color:var(--gold)}
+.toast{position:fixed; left:50%; bottom:92px; transform:translateX(-50%);
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  padding:10px 16px; border-radius:11px; font-size:13.5px; z-index:30;
+  max-width:88vw; text-align:center;
+  opacity:0; pointer-events:none; transition:opacity .2s}
+.toast.show{opacity:1}
+.note{font-size:12px; color:var(--muted); margin-top:8px}
+hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
+.seg{display:flex; background:var(--surface2); border:1px solid var(--border);
+  border-radius:11px; padding:3px; margin-bottom:4px}
+.seg button{flex:1; border:none; background:none; color:var(--muted);
+  padding:9px 6px; border-radius:8px; font-size:13px}
+.seg button.on{background:var(--surface); color:var(--text); border:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<header class="app"><h1>Alokasi Investasi</h1><span id="hdrmonth"></span></header>
+<main>
+
+<!-- ================= BERANDA ================= -->
+<section class="page active" id="page-home">
+  <div class="card">
+    <h2>Target Investasi</h2>
+    <div class="ringwrap">
+      <div class="ring">
+        <svg width="118" height="118" viewBox="0 0 118 118">
+          <circle cx="59" cy="59" r="52" stroke="var(--surface2)" stroke-width="10" fill="none"/>
+          <circle id="ringbar" cx="59" cy="59" r="52" stroke="var(--gold)" stroke-width="10"
+            fill="none" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="pct"><b id="pctTarget">0%</b><small>tercapai</small></div>
+      </div>
+      <div class="tstats">
+        <div class="row"><span class="k">Target</span><span class="v" id="vTarget">Rp0</span></div>
+        <div class="row"><span class="k">Nilai saat ini</span><span class="v" id="vNow">Rp0</span></div>
+        <div class="row"><span class="k">Sisa target</span><span class="v" id="vGap">Rp0</span></div>
+        <div class="row"><span class="k">Bulan berjalan</span><span class="v" id="vMonths">0 / 120</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sumber Nilai Portofolio</h2>
+    <div class="tstats">
+      <div class="row"><span class="k">Setoran pokok</span><span class="v" id="vKontribusi">Rp0</span></div>
+      <div class="row"><span class="k">Pendapatan pasif (neto pajak)</span><span class="v pos" id="vPasif">Rp0</span></div>
+      <div class="row"><span class="k">Untung / rugi jual aset (neto)</span><span class="v" id="vPL">Rp0</span></div>
+    </div>
+    <hr class="sep">
+    <div class="tstats">
+      <div class="row"><span class="k">Kebutuhan per bulan sisa</span><span class="v" id="vNeed">Rp0</span></div>
+      <div class="row"><span class="k">Rata-rata pasif per bulan</span><span class="v pos" id="vPasifBln">Rp0</span></div>
+      <div class="row"><span class="k">Kebutuhan setoran neto per bulan</span><span class="v" id="vNeedNet">Rp0</span></div>
+    </div>
+    <p class="note">Kebutuhan setoran neto adalah kebutuhan per bulan dikurangi rata-rata pendapatan pasif historis. Estimasi, bukan proyeksi pasti.</p>
+  </div>
+
+  <div class="card">
+    <h2>Rencana vs Riil</h2>
+    <div class="legendline">
+      <span><span class="sw faint"></span>Rencana</span>
+      <span><span class="sw"></span>Riil saat ini</span>
+    </div>
+    <div id="homeAlloc"></div>
+  </div>
+</section>
+
+<!-- ================= SETORAN ================= -->
+<section class="page" id="page-input">
+  <div class="card">
+    <h2>Setoran Bulanan</h2>
+    <label class="f" for="inMonth">Bulan</label>
+    <input type="month" id="inMonth">
+    <label class="f" for="inAmount">Jumlah setoran</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="inAmount" inputmode="numeric" placeholder="10.000.000">
+    </div>
+    <div class="btnrow">
+      <button class="small" id="btnFillPlan">Isi sesuai rencana</button>
+      <button class="small" id="btnFillRebal">Isi sesuai rebalancing</button>
+    </div>
+    <p class="note">Isi sesuai rencana membagi setoran menurut persentase rencana. Isi sesuai rebalancing memberi porsi lebih besar ke aset yang masih di bawah target.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pembagian ke Aset</h2>
+    <div id="splitList"></div>
+    <div class="sumline"><span>Total riil terisi</span><b id="sumActual">Rp0</b></div>
+    <div class="btnrow"><button class="primary" id="btnSave">Simpan setoran</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Riwayat Setoran</h2>
+    <div id="histList"></div>
+  </div>
+</section>
+
+<!-- ================= TRANSAKSI ================= -->
+<section class="page" id="page-txn">
+  <div class="card">
+    <h2>Deposito</h2>
+    <div id="depoList"></div>
+    <hr class="sep">
+    <label class="f" for="dpName">Nama / bank (opsional)</label>
+    <input type="text" id="dpName" placeholder="Contoh: Deposito SeaBank">
+    <label class="f" for="dpPokok">Pokok</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="dpPokok" inputmode="numeric" placeholder="50.000.000">
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="f" for="dpRate">Bunga (% per tahun)</label>
+        <input type="text" id="dpRate" inputmode="decimal" placeholder="6">
+      </div>
+      <div>
+        <label class="f" for="dpTenor">Tenor (bulan)</label>
+        <input type="text" id="dpTenor" inputmode="numeric" placeholder="6">
+      </div>
+    </div>
+    <label class="f" for="dpStart">Tanggal mulai</label>
+    <input type="date" id="dpStart">
+    <label class="f" for="dpSumber">Sumber dana</label>
+    <select id="dpSumber"></select>
+    <div class="calcline"><span class="k">Jatuh tempo</span><b id="dpMat">-</b></div>
+    <div class="calcline"><span class="k">Bunga bruto saat jatuh tempo</span><b id="dpBruto">Rp0</b></div>
+    <div class="calcline"><span class="k">Pajak (<span id="dpTaxPct">20</span>%)</span><b id="dpTax">Rp0</b></div>
+    <div class="calcline"><span class="k">Bunga neto diterima</span><b class="pos" id="dpNeto">Rp0</b></div>
+    <div class="btnrow"><button class="primary" id="btnDepoSave">Simpan deposito</button></div>
+    <p class="note">Saat jatuh tempo, bunga neto otomatis dicatat sebagai pendapatan pasif dan pokok tetap di saldo Deposito. Pindahkan lewat form Jual / Alihkan jika ingin ke aset lain.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pendapatan Pasif</h2>
+    <p class="sub" style="margin-bottom:2px">Dividen, kupon, atau bunga. Pajak dipotong otomatis sesuai tarif per aset.</p>
+    <label class="f" for="pvAsset">Sumber</label>
+    <select id="pvAsset"></select>
+    <label class="f" for="pvGross">Jumlah bruto</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="pvGross" inputmode="numeric" placeholder="500.000">
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="f" for="pvTax">Pajak (%)</label>
+        <input type="text" id="pvTax" inputmode="decimal">
+      </div>
+      <div>
+        <label class="f" for="pvDate">Tanggal</label>
+        <input type="date" id="pvDate">
+      </div>
+    </div>
+    <label class="f" for="pvTo">Dana masuk ke</label>
+    <select id="pvTo"></select>
+    <div class="calcline"><span class="k">Neto diterima</span><b class="pos" id="pvNet">Rp0</b></div>
+    <div class="btnrow"><button class="primary" id="btnPvSave">Catat pendapatan</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Jual / Alihkan Aset</h2>
+    <label class="f" for="slAsset">Aset yang dijual</label>
+    <select id="slAsset"></select>
+    <label class="f" for="slBasis">Nilai buku yang dijual (modal)</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="slBasis" inputmode="numeric" placeholder="5.000.000">
+    </div>
+    <label class="f" for="slGross">Hasil penjualan bruto</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="slGross" inputmode="numeric" placeholder="5.500.000">
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="f" for="slTax">Pajak (Rp)</label>
+        <input type="text" id="slTax" inputmode="numeric" placeholder="0">
+      </div>
+      <div>
+        <label class="f" for="slDate">Tanggal</label>
+        <input type="date" id="slDate">
+      </div>
+    </div>
+    <label class="f" for="slTo">Dana masuk ke</label>
+    <select id="slTo"></select>
+    <div class="calcline"><span class="k">Neto diterima</span><b id="slNet">Rp0</b></div>
+    <div class="calcline"><span class="k">Untung / rugi</span><b id="slPL">Rp0</b></div>
+    <div class="btnrow"><button class="primary" id="btnSlSave">Catat penjualan</button></div>
+    <p class="note">Pajak terisi otomatis: saham IDX 0,1% dari hasil bruto, SBN 10% dari keuntungan. Bisa diubah manual. Untuk sekadar memindah alokasi tanpa untung rugi, samakan hasil bruto dengan nilai buku dan pajak 0.</p>
+  </div>
+
+  <div class="card">
+    <h2>Riwayat Transaksi</h2>
+    <div id="txnList"></div>
+  </div>
+</section>
+
+<!-- ================= ANALISIS ================= -->
+<section class="page" id="page-analysis">
+  <div class="card">
+    <h2>Posisi vs Rencana</h2>
+    <p class="sub" style="margin-bottom:10px">Nilai seharusnya dihitung dari persentase rencana dikali total portofolio saat ini (<b id="anTotal">Rp0</b>).</p>
+    <div id="anList"></div>
+  </div>
+  <div class="card">
+    <h2>Simulasi Setoran Berikutnya</h2>
+    <label class="f" for="simAmount">Jumlah setoran yang direncanakan</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="simAmount" inputmode="numeric" placeholder="10.000.000">
+    </div>
+    <div id="simList" style="margin-top:10px"></div>
+    <p class="note">Pembagian ini mendahulukan aset yang kekurangan agar portofolio kembali mendekati rencana tanpa perlu menjual aset yang kelebihan.</p>
+  </div>
+</section>
+
+<!-- ================= PENGATURAN ================= -->
+<section class="page" id="page-settings">
+  <div class="card">
+    <h2>Target</h2>
+    <label class="f" for="setTarget">Target dana</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="setTarget" inputmode="numeric">
+    </div>
+    <label class="f" for="setYears">Jangka waktu (tahun)</label>
+    <input type="text" id="setYears" inputmode="numeric">
+    <label class="f" for="setStart">Bulan mulai</label>
+    <input type="month" id="setStart">
+  </div>
+
+  <div class="card">
+    <h2>Persentase Rencana</h2>
+    <div class="allocgrid" id="allocEditor"></div>
+    <div class="allocsum">Total: <b id="allocSum">100%</b> <span class="sub">(harus 100%)</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Tarif Pajak Pendapatan Pasif (%)</h2>
+    <div class="taxgrid" id="taxEditor"></div>
+    <p class="note">Default: bunga deposito 20% (PPh final Pasal 4 ayat 2), kupon SBN 10%, dividen IDX 10% (isi 0 jika dividen diinvestasikan kembali minimal 3 tahun dan dilaporkan ke DJP), dividen ETF global 15% (withholding AS dengan W-8BEN, isi 30% jika tanpa W-8BEN), RDPU 0% (bukan objek pajak). Ubah jika regulasi berubah.</p>
+  </div>
+
+  <div class="card">
+    <h2>Saldo Awal per Aset</h2>
+    <p class="sub" style="margin-bottom:4px">Isi jika sudah punya aset sebelum mulai mencatat.</p>
+    <div id="saldoEditor"></div>
+  </div>
+
+  <div class="btnrow"><button class="primary" id="btnSaveSet">Simpan pengaturan</button></div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>Data</h2>
+    <div class="btnrow">
+      <button class="small" id="btnExport">Ekspor data (JSON)</button>
+      <button class="small" id="btnImport">Impor data</button>
+    </div>
+    <input type="file" id="fileImport" accept="application/json" style="display:none">
+    <hr class="sep">
+    <button class="danger small" id="btnReset">Hapus semua data</button>
+    <p class="note">Data tersimpan hanya di HP ini (localStorage). Ekspor secara berkala sebagai cadangan.</p>
+  </div>
+</section>
+
+</main>
+
+<nav class="tabs">
+  <button data-page="home" class="on"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/></svg>Beranda</button>
+  <button data-page="input"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Setoran</button>
+  <button data-page="txn"><svg viewBox="0 0 24 24"><path d="M4 7h13M13 3l4 4-4 4"/><path d="M20 17H7M11 13l-4 4 4 4"/></svg>Transaksi</button>
+  <button data-page="analysis"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Analisis</button>
+  <button data-page="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/></svg>Atur</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ---------- konstanta ---------- */
+const ASSETS = [
+  {k:"idx",  n:"Saham IDX",          c:"var(--idx)",  income:"Dividen saham IDX"},
+  {k:"etf",  n:"ETF Ekuitas Global", c:"var(--etf)",  income:"Dividen ETF global"},
+  {k:"sbn",  n:"SBN Ritel",          c:"var(--sbn)",  income:"Kupon SBN"},
+  {k:"depo", n:"Deposito",           c:"var(--depo)", income:"Bunga deposito (manual)"},
+  {k:"rdpu", n:"Pasar Uang / RDPU",  c:"var(--rdpu)", income:"Imbal hasil RDPU"},
+  {k:"emas", n:"Emas",               c:"var(--emas)", income:null}
+];
+const A = {}; ASSETS.forEach(a=>A[a.k]=a);
+const DEFAULT_ALLOC = {idx:38, etf:30, sbn:15, depo:7, rdpu:5, emas:5};
+const DEFAULT_TAX = {idx:10, etf:15, sbn:10, depo:20, rdpu:0};
+const TAX_LABELS = {idx:"Dividen saham IDX", etf:"Dividen ETF global", sbn:"Kupon SBN", depo:"Bunga deposito", rdpu:"Imbal hasil RDPU"};
+const LS_KEY = "alokasiInvestasiV2";
+const LS_OLD = "alokasiInvestasiV1";
+const MONTHS_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+
+/* ---------- state ---------- */
+function zeroMap(){ const o={}; ASSETS.forEach(a=>o[a.k]=0); return o; }
+function defaultState(){
+  const d = new Date();
+  const ym = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+  return {v:2, target:2000000000, years:10, start:ym,
+    alloc:{...DEFAULT_ALLOC}, tax:{...DEFAULT_TAX},
+    saldoAwal:zeroMap(), entries:[], txns:[], depos:[]};
+}
+let S = load();
+function load(){
+  try{
+    let raw = localStorage.getItem(LS_KEY);
+    if(!raw){
+      const old = localStorage.getItem(LS_OLD);
+      if(old){
+        const p = JSON.parse(old);
+        const st = defaultState();
+        st.target = p.target ?? st.target;
+        st.years = p.years ?? st.years;
+        st.start = p.start ?? st.start;
+        if(p.alloc){ st.alloc = {...zeroMap(), ...p.alloc}; if(!("depo" in p.alloc)) st.alloc.depo = 0; }
+        st.saldoAwal = {...zeroMap(), ...(p.saldoAwal||{})};
+        (p.entries||[]).forEach(e=>{
+          st.entries.push({id:e.id, month:e.month, actual:{...zeroMap(), ...e.actual}, total:e.total});
+        });
+        localStorage.setItem(LS_KEY, JSON.stringify(st));
+        return st;
+      }
+      return defaultState();
+    }
+    const p = JSON.parse(raw);
+    const base = defaultState();
+    return {...base, ...p,
+      alloc:{...base.alloc, ...(p.alloc||{})},
+      tax:{...base.tax, ...(p.tax||{})},
+      saldoAwal:{...base.saldoAwal, ...(p.saldoAwal||{})},
+      entries:Array.isArray(p.entries)?p.entries:[],
+      txns:Array.isArray(p.txns)?p.txns:[],
+      depos:Array.isArray(p.depos)?p.depos:[]};
+  }catch(e){ return defaultState(); }
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(S)); }
+
+/* ---------- util ---------- */
+const $ = s => document.querySelector(s);
+const fmt = n => "Rp" + Math.round(n).toLocaleString("id-ID");
+const fmtS = n => (n<0?"-":"+") + "Rp" + Math.abs(Math.round(n)).toLocaleString("id-ID");
+const pct1 = n => (Math.round(n*10)/10).toLocaleString("id-ID") + "%";
+function parseNum(v){ return parseInt(String(v).replace(/[^\d]/g,""),10) || 0; }
+function parseDec(v){ return parseFloat(String(v).replace(",",".")) || 0; }
+function bindMoney(inp, oninput){
+  inp.addEventListener("input", ()=>{
+    const n = parseNum(inp.value);
+    inp.value = n ? n.toLocaleString("id-ID") : "";
+    if(oninput) oninput(n);
+  });
+}
+function ymLabel(ym){ const [y,m]=ym.split("-").map(Number); return MONTHS_ID[m-1]+" "+y; }
+function dLabel(iso){
+  if(!iso) return "-";
+  const [y,m,d] = iso.split("-").map(Number);
+  return d+" "+MONTHS_ID[m-1].slice(0,3)+" "+y;
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function addMonths(iso, n){
+  const [y,m,d] = iso.split("-").map(Number);
+  const dt = new Date(y, m-1+n, 1);
+  const last = new Date(dt.getFullYear(), dt.getMonth()+1, 0).getDate();
+  dt.setDate(Math.min(d,last));
+  return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+}
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2600);
+}
+function fillAssetSelect(sel, opts){
+  opts = opts || {};
+  sel.innerHTML = "";
+  ASSETS.forEach(a=>{
+    if(opts.incomeOnly && !a.income) return;
+    const o = document.createElement("option");
+    o.value = a.k;
+    o.textContent = opts.incomeOnly ? a.income : a.n;
+    sel.appendChild(o);
+  });
+  if(opts.extraFirst){
+    const o = document.createElement("option");
+    o.value = "__baru"; o.textContent = "Dana baru (di luar setoran bulanan)";
+    sel.insertBefore(o, sel.firstChild);
+    sel.value = "__baru";
+  }
+}
+
+/* ---------- perhitungan inti ---------- */
+function holdings(){
+  const h = zeroMap();
+  ASSETS.forEach(a=> h[a.k] += S.saldoAwal[a.k]||0);
+  S.entries.forEach(e=> ASSETS.forEach(a=> h[a.k] += e.actual[a.k]||0));
+  S.txns.forEach(t=>{
+    if(t.type==="income"){ h[t.toAsset] += t.net; }
+    else if(t.type==="jual"){ h[t.asset] -= t.basis; h[t.toAsset] += t.net; }
+    else if(t.type==="depo"){
+      if(t.asset==="__baru"){ h.depo += t.gross; }
+      else { h[t.asset] -= t.gross; h.depo += t.gross; }
+    }
+  });
+  return h;
+}
+function totals(){
+  let kontribusi = 0, pasif = 0, pl = 0;
+  ASSETS.forEach(a=> kontribusi += S.saldoAwal[a.k]||0);
+  S.entries.forEach(e=> kontribusi += e.total);
+  S.txns.forEach(t=>{
+    if(t.type==="income") pasif += t.net;
+    else if(t.type==="jual") pl += t.pl;
+    else if(t.type==="depo" && t.asset==="__baru") kontribusi += t.gross;
+  });
+  return {kontribusi, pasif, pl};
+}
+function totalNow(){ const h=holdings(); return ASSETS.reduce((s,a)=>s+h[a.k],0); }
+function planSplit(amount, alloc){
+  alloc = alloc || S.alloc;
+  const out={}; let acc=0;
+  ASSETS.forEach((a,i)=>{
+    if(i===ASSETS.length-1){ out[a.k]=amount-acc; }
+    else{ out[a.k]=Math.round(amount*alloc[a.k]/100); acc+=out[a.k]; }
+  });
+  return out;
+}
+function rebalanceSplit(amount){
+  const h = holdings();
+  const after = totalNow()+amount;
+  let gaps={}, sum=0;
+  ASSETS.forEach(a=>{
+    const g = Math.max(0, after*S.alloc[a.k]/100 - h[a.k]);
+    gaps[a.k]=g; sum+=g;
+  });
+  if(sum<=0) return planSplit(amount);
+  const out={}; let acc=0;
+  ASSETS.forEach((a,i)=>{
+    if(i===ASSETS.length-1){ out[a.k]=amount-acc; }
+    else{ out[a.k]=Math.round(amount*gaps[a.k]/sum); acc+=out[a.k]; }
+  });
+  return out;
+}
+function depoInterest(dp){
+  const bruto = dp.pokok * dp.rate/100 * dp.tenor/12;
+  const tax = bruto * (S.tax.depo||0)/100;
+  return {bruto, tax, net:bruto-tax};
+}
+
+/* ---------- jatuh tempo deposito otomatis ---------- */
+function processMaturities(){
+  const today = todayISO();
+  let n = 0, sum = 0;
+  S.depos.forEach(dp=>{
+    if(dp.status==="aktif" && dp.matDate <= today){
+      const {bruto, tax, net} = depoInterest(dp);
+      S.txns.push({id:Date.now()+Math.random(), date:dp.matDate, type:"income",
+        asset:"depo", toAsset:"depo", gross:Math.round(bruto), tax:Math.round(tax),
+        net:Math.round(net), basis:0, pl:0, depoId:dp.id,
+        note:"Bunga deposito jatuh tempo"+(dp.name?" ("+dp.name+")":"")});
+      dp.status="cair"; n++; sum+=net;
+    }
+  });
+  if(n){ save(); toast(n+" deposito jatuh tempo. Bunga neto "+fmt(sum)+" tercatat otomatis."); }
+}
+
+/* ---------- BERANDA ---------- */
+function renderHome(){
+  const total = totalNow();
+  const {kontribusi, pasif, pl} = totals();
+  const pct = S.target>0 ? total/S.target*100 : 0;
+  $("#vTarget").textContent = fmt(S.target);
+  $("#vNow").textContent = fmt(total);
+  $("#vGap").textContent = fmt(Math.max(0, S.target-total));
+  $("#pctTarget").textContent = pct1(Math.min(pct,999));
+  const C = 326.7;
+  $("#ringbar").style.strokeDashoffset = C*(1-Math.min(pct,100)/100);
+
+  const totM = (S.years||0)*12;
+  const nM = S.entries.length;
+  $("#vMonths").textContent = nM+" / "+totM;
+  const remM = Math.max(1, totM-nM);
+  const need = Math.max(0, S.target-total)/remM;
+  $("#vNeed").textContent = fmt(need);
+
+  $("#vKontribusi").textContent = fmt(kontribusi);
+  $("#vPasif").textContent = "+"+fmt(pasif);
+  const plEl = $("#vPL");
+  plEl.textContent = fmtS(pl);
+  plEl.className = "v "+(pl>0?"pos":pl<0?"neg":"");
+  const pasifBln = pasif/Math.max(1,nM);
+  $("#vPasifBln").textContent = "+"+fmt(pasifBln);
+  $("#vNeedNet").textContent = fmt(Math.max(0, need-pasifBln));
+
+  const h = holdings();
+  const box = $("#homeAlloc"); box.innerHTML = "";
+  ASSETS.forEach(a=>{
+    const real = total>0 ? h[a.k]/total*100 : 0;
+    const plan = S.alloc[a.k];
+    const maxRef = Math.max(plan, real, 1);
+    const row = document.createElement("div");
+    row.className = "arow";
+    row.innerHTML =
+      '<div class="top"><span class="name"><span class="dot" style="background:'+a.c+'"></span>'+a.n+'</span>'+
+      '<span class="pcts"><b>'+pct1(real)+'</b> <span>/ '+pct1(plan)+'</span></span></div>'+
+      '<div class="bars">'+
+      '<div class="bar plan"><i style="width:'+(plan/maxRef*100)+'%;background:'+a.c+'"></i></div>'+
+      '<div class="bar real"><i style="width:'+(real/maxRef*100)+'%;background:'+a.c+'"></i></div>'+
+      '</div>'+
+      '<div class="barlabels"><span>Riil '+fmt(h[a.k])+'</span><span>Seharusnya '+fmt(total*plan/100)+'</span></div>';
+    box.appendChild(row);
+  });
+}
+
+/* ---------- SETORAN ---------- */
+let splitInputs = {};
+function buildSplitList(){
+  const box = $("#splitList"); box.innerHTML=""; splitInputs={};
+  ASSETS.forEach(a=>{
+    const row = document.createElement("div");
+    row.className = "splitrow";
+    row.innerHTML =
+      '<div class="head"><span class="name"><span class="dot" style="background:'+a.c+';display:inline-block;margin-right:7px"></span><b>'+a.n+'</b></span>'+
+      '<span class="plan" id="plan-'+a.k+'">Rencana Rp0</span></div>';
+    const wrap = document.createElement("div");
+    wrap.className = "inrow"; wrap.innerHTML = '<span class="pre">Rp</span>';
+    const inp = document.createElement("input");
+    inp.type="text"; inp.inputMode="numeric"; inp.placeholder="0";
+    inp.setAttribute("aria-label","Jumlah riil "+a.n);
+    bindMoney(inp, updateSum);
+    wrap.appendChild(inp); row.appendChild(wrap); box.appendChild(row);
+    splitInputs[a.k]=inp;
+  });
+}
+function updatePlanPreview(){
+  const amt = parseNum($("#inAmount").value);
+  const sp = planSplit(amt);
+  ASSETS.forEach(a=> $("#plan-"+a.k).textContent = "Rencana "+fmt(sp[a.k]));
+  updateSum();
+}
+function updateSum(){
+  const amt = parseNum($("#inAmount").value);
+  let s=0; ASSETS.forEach(a=> s+=parseNum(splitInputs[a.k].value));
+  const el = $("#sumActual");
+  el.textContent = fmt(s)+(amt?" dari "+fmt(amt):"");
+  el.className = (amt && s!==amt)?"bad":"ok";
+}
+function fillInputs(map){
+  ASSETS.forEach(a=> splitInputs[a.k].value = map[a.k]?map[a.k].toLocaleString("id-ID"):"");
+  updateSum();
+}
+function saveEntry(){
+  const ym = $("#inMonth").value;
+  if(!ym){ toast("Pilih bulan dulu"); return; }
+  const actual = {}; let tot=0;
+  ASSETS.forEach(a=>{ actual[a.k]=parseNum(splitInputs[a.k].value); tot+=actual[a.k]; });
+  if(tot<=0){ toast("Isi jumlah riil minimal satu aset"); return; }
+  const ix = S.entries.findIndex(e=>e.month===ym);
+  if(ix>=0){
+    if(!confirm("Setoran bulan "+ymLabel(ym)+" sudah ada. Timpa dengan data baru?")) return;
+    S.entries[ix] = {id:S.entries[ix].id, month:ym, actual, total:tot};
+  }else{
+    S.entries.push({id:Date.now(), month:ym, actual, total:tot});
+  }
+  S.entries.sort((a,b)=> a.month<b.month?-1:1);
+  save(); renderAll();
+  $("#inAmount").value=""; fillInputs({}); updatePlanPreview();
+  toast("Setoran "+ymLabel(ym)+" tersimpan");
+  switchPage("home");
+}
+function renderHistory(){
+  const box = $("#histList"); box.innerHTML="";
+  if(!S.entries.length){ box.innerHTML='<p class="empty">Belum ada setoran tercatat.</p>'; return; }
+  [...S.entries].reverse().forEach(e=>{
+    const det = document.createElement("details");
+    det.className="hitem";
+    let rows="";
+    ASSETS.forEach(a=>{ rows+='<div class="r2"><span>'+a.n+'</span><span>'+fmt(e.actual[a.k]||0)+'</span></div>'; });
+    det.innerHTML =
+      '<summary><span class="l">'+ymLabel(e.month)+'</span><span class="r">'+fmt(e.total)+'</span></summary>'+
+      '<div class="detail">'+rows+
+      '<div class="btnrow"><button class="danger small" data-del="'+e.id+'">Hapus setoran ini</button></div></div>';
+    box.appendChild(det);
+  });
+  box.querySelectorAll("[data-del]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const id = Number(b.dataset.del);
+      const e = S.entries.find(x=>x.id===id);
+      if(confirm("Hapus setoran "+ymLabel(e.month)+"?")){
+        S.entries = S.entries.filter(x=>x.id!==id);
+        save(); renderAll(); toast("Setoran dihapus");
+      }
+    });
+  });
+}
+
+/* ---------- DEPOSITO ---------- */
+function updateDepoPreview(){
+  const pokok = parseNum($("#dpPokok").value);
+  const rate = parseDec($("#dpRate").value);
+  const tenor = parseNum($("#dpTenor").value);
+  const start = $("#dpStart").value;
+  $("#dpTaxPct").textContent = S.tax.depo;
+  const mat = (start && tenor) ? addMonths(start, tenor) : null;
+  $("#dpMat").textContent = mat ? dLabel(mat) : "-";
+  const bruto = pokok*rate/100*tenor/12;
+  const tax = bruto*S.tax.depo/100;
+  $("#dpBruto").textContent = fmt(bruto);
+  $("#dpTax").textContent = "-"+fmt(tax);
+  $("#dpNeto").textContent = "+"+fmt(bruto-tax);
+}
+function saveDepo(){
+  const pokok = parseNum($("#dpPokok").value);
+  const rate = parseDec($("#dpRate").value);
+  const tenor = parseNum($("#dpTenor").value);
+  const start = $("#dpStart").value;
+  const sumber = $("#dpSumber").value;
+  if(pokok<=0 || rate<=0 || tenor<=0 || !start){ toast("Lengkapi pokok, bunga, tenor, dan tanggal"); return; }
+  if(sumber!=="__baru" && sumber!=="depo"){
+    const h = holdings();
+    if(h[sumber] < pokok){ toast("Saldo "+A[sumber].n+" tidak cukup ("+fmt(h[sumber])+")"); return; }
+  }
+  const id = Date.now();
+  const dp = {id, name:$("#dpName").value.trim(), pokok, rate, tenor,
+    startDate:start, matDate:addMonths(start,tenor), sumber, status:"aktif"};
+  S.depos.push(dp);
+  if(sumber!=="depo"){
+    S.txns.push({id:id+1, date:start, type:"depo", asset:sumber, toAsset:"depo",
+      gross:pokok, tax:0, net:pokok, basis:0, pl:0, depoId:id,
+      note:"Penempatan deposito"+(dp.name?" ("+dp.name+")":"")});
+  }
+  save();
+  processMaturities();
+  renderAll();
+  ["dpName","dpPokok","dpRate","dpTenor"].forEach(i=>$("#"+i).value="");
+  $("#dpStart").value = todayISO();
+  updateDepoPreview();
+  toast("Deposito tersimpan. Jatuh tempo "+dLabel(dp.matDate));
+}
+function renderDepos(){
+  const box = $("#depoList"); box.innerHTML="";
+  if(!S.depos.length){ box.innerHTML='<p class="empty">Belum ada deposito tercatat.</p>'; return; }
+  [...S.depos].sort((a,b)=> a.matDate<b.matDate?-1:1).forEach(dp=>{
+    const {net} = depoInterest(dp);
+    const det = document.createElement("details");
+    det.className="hitem";
+    det.innerHTML =
+      '<summary><span class="l">'+(dp.name||"Deposito")+
+      '<small>'+dp.rate.toLocaleString("id-ID")+'% p.a. · '+dp.tenor+' bln · JT '+dLabel(dp.matDate)+'</small></span>'+
+      '<span class="r">'+fmt(dp.pokok)+
+      '<small><span class="badge '+dp.status+'">'+(dp.status==="aktif"?"Aktif":"Cair")+'</span></small></span></summary>'+
+      '<div class="detail">'+
+      '<div class="r2"><span>Mulai</span><span>'+dLabel(dp.startDate)+'</span></div>'+
+      '<div class="r2"><span>Bunga neto (pajak '+S.tax.depo+'%)</span><span class="pl-pos">+'+fmt(net)+'</span></div>'+
+      '<div class="r2"><span>Sumber dana</span><span>'+(dp.sumber==="__baru"?"Dana baru":A[dp.sumber].n)+'</span></div>'+
+      '<div class="btnrow"><button class="danger small" data-deldp="'+dp.id+'">Hapus deposito ini</button></div></div>';
+    box.appendChild(det);
+  });
+  box.querySelectorAll("[data-deldp]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const id = Number(b.dataset.deldp);
+      if(confirm("Hapus deposito ini beserta transaksi terkait (penempatan dan bunganya)?")){
+        S.depos = S.depos.filter(x=>x.id!==id);
+        S.txns = S.txns.filter(t=>t.depoId!==id);
+        save(); renderAll(); toast("Deposito dihapus");
+      }
+    });
+  });
+}
+
+/* ---------- PENDAPATAN PASIF ---------- */
+function updatePvPreview(){
+  const g = parseNum($("#pvGross").value);
+  const t = parseDec($("#pvTax").value);
+  $("#pvNet").textContent = "+"+fmt(g*(1-t/100));
+}
+function savePv(){
+  const asset = $("#pvAsset").value;
+  const gross = parseNum($("#pvGross").value);
+  const taxPct = parseDec($("#pvTax").value);
+  const date = $("#pvDate").value || todayISO();
+  const to = $("#pvTo").value;
+  if(gross<=0){ toast("Isi jumlah bruto"); return; }
+  const tax = Math.round(gross*taxPct/100);
+  S.txns.push({id:Date.now(), date, type:"income", asset, toAsset:to,
+    gross, tax, net:gross-tax, basis:0, pl:0,
+    note:(A[asset].income||"Pendapatan")+" (pajak "+taxPct.toLocaleString("id-ID")+"%)"});
+  save(); renderAll();
+  $("#pvGross").value=""; updatePvPreview();
+  toast("Pendapatan pasif "+fmt(gross-tax)+" tercatat");
+}
+
+/* ---------- JUAL / ALIHKAN ---------- */
+function prefillSaleTax(){
+  const asset = $("#slAsset").value;
+  const basis = parseNum($("#slBasis").value);
+  const gross = parseNum($("#slGross").value);
+  let tax = 0;
+  if(asset==="idx") tax = Math.round(gross*0.001);
+  else if(asset==="sbn") tax = Math.round(Math.max(0,gross-basis)*0.10);
+  $("#slTax").value = tax ? tax.toLocaleString("id-ID") : "";
+  updateSlPreview();
+}
+function updateSlPreview(){
+  const basis = parseNum($("#slBasis").value);
+  const gross = parseNum($("#slGross").value);
+  const tax = parseNum($("#slTax").value);
+  const net = gross-tax;
+  const pl = net-basis;
+  $("#slNet").textContent = fmt(net);
+  const el = $("#slPL");
+  el.textContent = fmtS(pl);
+  el.className = pl>0?"pl-pos":pl<0?"pl-neg":"";
+}
+function saveSl(){
+  const asset = $("#slAsset").value;
+  const to = $("#slTo").value;
+  const basis = parseNum($("#slBasis").value);
+  const gross = parseNum($("#slGross").value);
+  const tax = parseNum($("#slTax").value);
+  const date = $("#slDate").value || todayISO();
+  if(basis<=0 || gross<=0){ toast("Isi nilai buku dan hasil penjualan"); return; }
+  if(asset===to){ toast("Aset asal dan tujuan tidak boleh sama"); return; }
+  const h = holdings();
+  if(h[asset] < basis){ toast("Nilai buku melebihi saldo "+A[asset].n+" ("+fmt(h[asset])+")"); return; }
+  const net = gross-tax;
+  S.txns.push({id:Date.now(), date, type:"jual", asset, toAsset:to,
+    gross, tax, net, basis, pl:net-basis,
+    note:"Jual "+A[asset].n+" ke "+A[to].n});
+  save(); renderAll();
+  ["slBasis","slGross","slTax"].forEach(i=>$("#"+i).value="");
+  updateSlPreview();
+  toast("Penjualan tercatat, untung/rugi "+fmtS(net-basis));
+}
+
+/* ---------- RIWAYAT TRANSAKSI ---------- */
+function renderTxns(){
+  const box = $("#txnList"); box.innerHTML="";
+  if(!S.txns.length){ box.innerHTML='<p class="empty">Belum ada transaksi tercatat.</p>'; return; }
+  [...S.txns].sort((a,b)=> a.date<b.date?1:-1).forEach(t=>{
+    const det = document.createElement("details");
+    det.className="hitem";
+    let title, amount, detail="";
+    if(t.type==="income"){
+      title = t.note; amount = '<span class="pl-pos">+'+fmt(t.net)+'</span>';
+      detail =
+        '<div class="r2"><span>Bruto</span><span>'+fmt(t.gross)+'</span></div>'+
+        '<div class="r2"><span>Pajak</span><span>-'+fmt(t.tax)+'</span></div>'+
+        '<div class="r2"><span>Masuk ke</span><span>'+A[t.toAsset].n+'</span></div>';
+    }else if(t.type==="jual"){
+      title = t.note;
+      amount = '<span class="'+(t.pl>=0?"pl-pos":"pl-neg")+'">'+fmtS(t.pl)+'</span>';
+      detail =
+        '<div class="r2"><span>Nilai buku</span><span>'+fmt(t.basis)+'</span></div>'+
+        '<div class="r2"><span>Hasil bruto</span><span>'+fmt(t.gross)+'</span></div>'+
+        '<div class="r2"><span>Pajak</span><span>-'+fmt(t.tax)+'</span></div>'+
+        '<div class="r2"><span>Neto masuk '+A[t.toAsset].n+'</span><span>'+fmt(t.net)+'</span></div>';
+    }else{
+      title = t.note;
+      amount = fmt(t.gross);
+      detail = '<div class="r2"><span>Sumber</span><span>'+(t.asset==="__baru"?"Dana baru":A[t.asset].n)+'</span></div>';
+    }
+    det.innerHTML =
+      '<summary><span class="l">'+title+'<small>'+dLabel(t.date)+'</small></span>'+
+      '<span class="r">'+amount+'</span></summary>'+
+      '<div class="detail">'+detail+
+      '<div class="btnrow"><button class="danger small" data-deltx="'+t.id+'">Hapus transaksi ini</button></div></div>';
+    box.appendChild(det);
+  });
+  box.querySelectorAll("[data-deltx]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const id = Number(b.dataset.deltx);
+      const t = S.txns.find(x=>x.id===id);
+      if(t && t.depoId && !confirm("Transaksi ini terkait deposito. Tetap hapus?")) return;
+      if(confirm("Hapus transaksi ini?")){
+        S.txns = S.txns.filter(x=>x.id!==id);
+        save(); renderAll(); toast("Transaksi dihapus");
+      }
+    });
+  });
+}
+
+/* ---------- ANALISIS ---------- */
+function renderAnalysis(){
+  const total = totalNow(); const h = holdings();
+  $("#anTotal").textContent = fmt(total);
+  const box = $("#anList"); box.innerHTML="";
+  if(total<=0){ box.innerHTML='<p class="empty">Belum ada data. Catat setoran pertama Anda.</p>'; }
+  ASSETS.forEach(a=>{
+    if(total<=0) return;
+    const real = h[a.k], should = total*S.alloc[a.k]/100;
+    const diff = real-should;
+    const realPct = real/total*100;
+    const drift = realPct-S.alloc[a.k];
+    let badge, cls, act;
+    if(Math.abs(drift)<=1){ badge="Sesuai"; cls="ok"; act='<span class="action hold">Pertahankan porsi saat ini</span>'; }
+    else if(diff>0){ badge="Lebih "+pct1(drift); cls="over"; act='<span class="action trim">Kelebihan '+fmt(diff)+'. Kurangi porsi setoran ke aset ini</span>'; }
+    else{ badge="Kurang "+pct1(-drift); cls="under"; act='<span class="action buy">Perlu tambah '+fmt(-diff)+' untuk sesuai rencana</span>'; }
+    const d = document.createElement("div");
+    d.className="diffcard";
+    d.innerHTML =
+      '<div class="l1"><span class="name"><span class="dot" style="background:'+a.c+';display:inline-block;margin-right:7px"></span><b>'+a.n+'</b></span>'+
+      '<span class="badge '+cls+'">'+badge+'</span></div>'+
+      '<div class="nums">'+
+      '<div><div class="k">Riil</div>'+fmt(real)+' ('+pct1(realPct)+')</div>'+
+      '<div><div class="k">Seharusnya</div>'+fmt(should)+' ('+pct1(S.alloc[a.k])+')</div>'+
+      '</div>'+act;
+    box.appendChild(d);
+  });
+  renderSim();
+}
+function renderSim(){
+  const amt = parseNum($("#simAmount").value);
+  const box = $("#simList"); box.innerHTML="";
+  if(!amt){ box.innerHTML='<p class="empty">Masukkan jumlah untuk melihat pembagiannya.</p>'; return; }
+  const sp = rebalanceSplit(amt);
+  ASSETS.forEach(a=>{
+    const r = document.createElement("div");
+    r.className="splitrow";
+    r.innerHTML='<div class="head"><span class="name"><span class="dot" style="background:'+a.c+';display:inline-block;margin-right:7px"></span>'+a.n+'</span><b>'+fmt(sp[a.k])+'</b></div>';
+    box.appendChild(r);
+  });
+}
+
+/* ---------- PENGATURAN ---------- */
+let allocInputs={}, saldoInputs={}, taxInputs={};
+function buildSettings(){
+  const ae = $("#allocEditor"); ae.innerHTML=""; allocInputs={};
+  ASSETS.forEach(a=>{
+    const nm = document.createElement("div");
+    nm.className="an";
+    nm.innerHTML='<span class="dot" style="background:'+a.c+'"></span>'+a.n;
+    const inp = document.createElement("input");
+    inp.type="text"; inp.inputMode="decimal";
+    inp.setAttribute("aria-label","Persentase "+a.n);
+    inp.addEventListener("input", updateAllocSum);
+    ae.appendChild(nm); ae.appendChild(inp);
+    allocInputs[a.k]=inp;
+  });
+  const te = $("#taxEditor"); te.innerHTML=""; taxInputs={};
+  Object.keys(DEFAULT_TAX).forEach(k=>{
+    const nm = document.createElement("div");
+    nm.textContent = TAX_LABELS[k];
+    const inp = document.createElement("input");
+    inp.type="text"; inp.inputMode="decimal";
+    inp.setAttribute("aria-label","Pajak "+TAX_LABELS[k]);
+    te.appendChild(nm); te.appendChild(inp);
+    taxInputs[k]=inp;
+  });
+  const se = $("#saldoEditor"); se.innerHTML=""; saldoInputs={};
+  ASSETS.forEach(a=>{
+    const lab = document.createElement("label");
+    lab.className="f"; lab.textContent=a.n;
+    const wrap = document.createElement("div");
+    wrap.className="inrow"; wrap.innerHTML='<span class="pre">Rp</span>';
+    const inp = document.createElement("input");
+    inp.type="text"; inp.inputMode="numeric"; inp.placeholder="0";
+    bindMoney(inp);
+    wrap.appendChild(inp);
+    se.appendChild(lab); se.appendChild(wrap);
+    saldoInputs[a.k]=inp;
+  });
+}
+function fillSettings(){
+  $("#setTarget").value = S.target.toLocaleString("id-ID");
+  $("#setYears").value = S.years;
+  $("#setStart").value = S.start;
+  ASSETS.forEach(a=>{
+    allocInputs[a.k].value = S.alloc[a.k];
+    saldoInputs[a.k].value = S.saldoAwal[a.k]?S.saldoAwal[a.k].toLocaleString("id-ID"):"";
+  });
+  Object.keys(DEFAULT_TAX).forEach(k=> taxInputs[k].value = S.tax[k]);
+  updateAllocSum();
+}
+function allocSumVal(){
+  let s=0; ASSETS.forEach(a=> s+=parseDec(allocInputs[a.k].value));
+  return Math.round(s*100)/100;
+}
+function updateAllocSum(){
+  const s = allocSumVal();
+  const el = $("#allocSum");
+  el.textContent = s.toLocaleString("id-ID")+"%";
+  el.className = s===100?"ok":"bad";
+}
+function saveSettings(){
+  const t = parseNum($("#setTarget").value);
+  const y = parseNum($("#setYears").value);
+  if(t<=0){ toast("Target harus lebih dari 0"); return; }
+  if(y<=0){ toast("Jangka waktu harus lebih dari 0"); return; }
+  if(allocSumVal()!==100){ toast("Total persentase rencana harus tepat 100%"); return; }
+  S.target=t; S.years=y;
+  S.start = $("#setStart").value || S.start;
+  ASSETS.forEach(a=>{
+    S.alloc[a.k]=parseDec(allocInputs[a.k].value);
+    S.saldoAwal[a.k]=parseNum(saldoInputs[a.k].value);
+  });
+  Object.keys(DEFAULT_TAX).forEach(k=> S.tax[k]=parseDec(taxInputs[k].value));
+  save(); renderAll(); updateDepoPreview(); syncPvTax();
+  toast("Pengaturan tersimpan");
+}
+function exportData(){
+  const blob = new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alokasi-investasi-backup-"+todayISO()+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importData(file){
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const p = JSON.parse(r.result);
+      if(!p || typeof p!=="object" || !p.alloc) throw 0;
+      S = {...defaultState(), ...p,
+        alloc:{...zeroMap(), ...p.alloc},
+        tax:{...DEFAULT_TAX, ...(p.tax||{})},
+        saldoAwal:{...zeroMap(), ...(p.saldoAwal||{})}};
+      if(!("depo" in (p.alloc||{}))) S.alloc.depo = 0;
+      S.entries = (p.entries||[]).map(e=>({...e, actual:{...zeroMap(), ...e.actual}}));
+      save(); fillSettings(); renderAll(); toast("Data berhasil diimpor");
+    }catch(e){ toast("File tidak valid"); }
+  };
+  r.readAsText(file);
+}
+
+/* ---------- navigasi & init ---------- */
+function switchPage(p){
+  document.querySelectorAll(".page").forEach(el=>el.classList.remove("active"));
+  $("#page-"+p).classList.add("active");
+  document.querySelectorAll("nav.tabs button").forEach(b=>
+    b.classList.toggle("on", b.dataset.page===p));
+  window.scrollTo({top:0});
+}
+function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderTxns(); renderAnalysis(); }
+function syncPvTax(){
+  const a = $("#pvAsset").value;
+  $("#pvTax").value = (S.tax[a] ?? 0);
+  updatePvPreview();
+}
+
+document.querySelectorAll("nav.tabs button").forEach(b=>
+  b.addEventListener("click", ()=>switchPage(b.dataset.page)));
+
+buildSplitList(); buildSettings(); fillSettings();
+
+fillAssetSelect($("#dpSumber"), {extraFirst:true});
+fillAssetSelect($("#pvAsset"), {incomeOnly:true});
+fillAssetSelect($("#pvTo"));
+fillAssetSelect($("#slAsset"));
+fillAssetSelect($("#slTo"));
+$("#slTo").value = "rdpu";
+
+const now = new Date();
+$("#inMonth").value = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+$("#hdrmonth").textContent = ymLabel($("#inMonth").value);
+$("#dpStart").value = todayISO();
+$("#pvDate").value = todayISO();
+$("#slDate").value = todayISO();
+
+bindMoney($("#inAmount"), updatePlanPreview);
+bindMoney($("#simAmount"), renderSim);
+bindMoney($("#dpPokok"), updateDepoPreview);
+$("#dpRate").addEventListener("input", updateDepoPreview);
+$("#dpTenor").addEventListener("input", updateDepoPreview);
+$("#dpStart").addEventListener("input", updateDepoPreview);
+bindMoney($("#pvGross"), updatePvPreview);
+$("#pvTax").addEventListener("input", updatePvPreview);
+$("#pvAsset").addEventListener("change", syncPvTax);
+bindMoney($("#slBasis"), prefillSaleTax);
+bindMoney($("#slGross"), prefillSaleTax);
+bindMoney($("#slTax"), updateSlPreview);
+$("#slAsset").addEventListener("change", prefillSaleTax);
+
+$("#btnFillPlan").addEventListener("click", ()=>{
+  const amt = parseNum($("#inAmount").value);
+  if(!amt){ toast("Isi jumlah setoran dulu"); return; }
+  fillInputs(planSplit(amt));
+});
+$("#btnFillRebal").addEventListener("click", ()=>{
+  const amt = parseNum($("#inAmount").value);
+  if(!amt){ toast("Isi jumlah setoran dulu"); return; }
+  fillInputs(rebalanceSplit(amt));
+});
+$("#btnSave").addEventListener("click", saveEntry);
+$("#btnDepoSave").addEventListener("click", saveDepo);
+$("#btnPvSave").addEventListener("click", savePv);
+$("#btnSlSave").addEventListener("click", saveSl);
+$("#btnSaveSet").addEventListener("click", saveSettings);
+$("#btnExport").addEventListener("click", exportData);
+$("#btnImport").addEventListener("click", ()=>$("#fileImport").click());
+$("#fileImport").addEventListener("change", e=>{
+  if(e.target.files[0]) importData(e.target.files[0]);
+  e.target.value="";
+});
+$("#btnReset").addEventListener("click", ()=>{
+  if(confirm("Hapus semua data termasuk riwayat setoran, deposito, dan transaksi?") &&
+     confirm("Yakin? Tindakan ini tidak bisa dibatalkan.")){
+    S = defaultState(); save(); fillSettings(); renderAll();
+    toast("Semua data dihapus");
+  }
+});
+
+syncPvTax();
+updateDepoPreview();
+updatePlanPreview();
+processMaturities();
+renderAll();
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
