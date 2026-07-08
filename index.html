@@ -16,7 +16,7 @@
 :root{
   --bg:#10151B; --surface:#191F27; --surface2:#202A36; --border:#2B3542;
   --text:#E9EDF2; --muted:#8C97A6; --gold:#E4B54A;
-  --idx:#5B8DEF; --etf:#9B7BE4; --sbn:#47BE8A; --depo:#E48A4F; --rdpu:#43B7C9; --emas:#E4B54A;
+  --idx:#5B8DEF; --etf:#9B7BE4; --sbn:#47BE8A; --depo:#E48A4F; --rdpu:#43B7C9; --emas:#E4B54A; --kas:#8C97A6;
   --pos:#47BE8A; --neg:#E4574F;
   --radius:14px;
   --font:'Space Grotesk',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -94,17 +94,25 @@ button.danger{background:transparent; color:var(--neg); border-color:var(--neg)}
 button.small{padding:8px 12px; font-size:13px; border-radius:9px}
 .btnrow{display:flex; gap:9px; flex-wrap:wrap; margin-top:12px}
 .btnrow button{flex:1; min-width:130px}
+label.chk{display:flex; align-items:center; gap:9px; font-size:13.5px; margin-top:12px; cursor:pointer}
+label.chk input{width:17px; height:17px; accent-color:var(--gold)}
 
 .splitrow{display:grid; grid-template-columns:1fr; gap:6px;
   padding:11px 0; border-bottom:1px solid var(--border)}
 .splitrow:last-of-type{border-bottom:none}
 .splitrow .head{display:flex; justify-content:space-between; align-items:baseline}
 .splitrow .plan{color:var(--muted); font-size:12.5px}
-.sumline{display:flex; justify-content:space-between; padding-top:12px; font-size:13.5px}
-.sumline b.ok{color:var(--pos)} .sumline b.bad{color:var(--neg)}
+.sumline{display:flex; justify-content:space-between; padding-top:10px; font-size:13.5px; gap:10px}
+.sumline .k{color:var(--muted)}
+.sumline b.ok{color:var(--pos)} .sumline b.bad{color:var(--neg)} .sumline b.neutral{color:var(--text)}
 .calcline{display:flex; justify-content:space-between; font-size:13px; margin-top:9px}
 .calcline .k{color:var(--muted)}
 .calcline b.pos{color:var(--pos)} .calcline b.neg{color:var(--neg)}
+.kasbanner{display:flex; justify-content:space-between; align-items:center;
+  background:var(--surface2); border:1px dashed var(--border); border-radius:10px;
+  padding:10px 12px; font-size:13px; margin-top:12px}
+.kasbanner .k{color:var(--muted)}
+.kasbanner b{color:var(--gold)}
 
 .diffcard{padding:12px 0; border-bottom:1px solid var(--border)}
 .diffcard:last-child{border-bottom:none}
@@ -115,6 +123,7 @@ button.small{padding:8px 12px; font-size:13px; border-radius:9px}
 .badge.ok{background:rgba(71,190,138,.15); color:var(--pos)}
 .badge.aktif{background:rgba(228,138,79,.15); color:var(--depo)}
 .badge.cair{background:rgba(71,190,138,.15); color:var(--pos)}
+.badge.kas{background:rgba(228,181,74,.15); color:var(--gold)}
 .diffcard .nums{display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; font-size:13px}
 .diffcard .nums .k{color:var(--muted); font-size:11.5px}
 .diffcard .action{margin-top:6px; font-size:13px; font-weight:600}
@@ -157,11 +166,6 @@ nav.tabs button.on{color:var(--gold)}
 .toast.show{opacity:1}
 .note{font-size:12px; color:var(--muted); margin-top:8px}
 hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
-.seg{display:flex; background:var(--surface2); border:1px solid var(--border);
-  border-radius:11px; padding:3px; margin-bottom:4px}
-.seg button{flex:1; border:none; background:none; color:var(--muted);
-  padding:9px 6px; border-radius:8px; font-size:13px}
-.seg button.on{background:var(--surface); color:var(--text); border:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -197,6 +201,7 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
       <div class="row"><span class="k">Setoran pokok</span><span class="v" id="vKontribusi">Rp0</span></div>
       <div class="row"><span class="k">Pendapatan pasif (neto pajak)</span><span class="v pos" id="vPasif">Rp0</span></div>
       <div class="row"><span class="k">Untung / rugi jual aset (neto)</span><span class="v" id="vPL">Rp0</span></div>
+      <div class="row"><span class="k">Dana bebas (belum dialokasikan)</span><span class="v" id="vKas">Rp0</span></div>
     </div>
     <hr class="sep">
     <div class="tstats">
@@ -223,21 +228,24 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
     <h2>Setoran Bulanan</h2>
     <label class="f" for="inMonth">Bulan</label>
     <input type="month" id="inMonth">
-    <label class="f" for="inAmount">Jumlah setoran</label>
+    <label class="f" for="inAmount">Jumlah setoran bulan ini</label>
     <div class="inrow"><span class="pre">Rp</span>
       <input type="text" id="inAmount" inputmode="numeric" placeholder="10.000.000">
     </div>
+    <div class="kasbanner"><span class="k">Dana bebas tersedia</span><b id="kasAvail">Rp0</b></div>
+    <label class="chk"><input type="checkbox" id="useKas">Ikutkan dana bebas dalam pembagian otomatis</label>
     <div class="btnrow">
       <button class="small" id="btnFillPlan">Isi sesuai rencana</button>
       <button class="small" id="btnFillRebal">Isi sesuai rebalancing</button>
     </div>
-    <p class="note">Isi sesuai rencana membagi setoran menurut persentase rencana. Isi sesuai rebalancing memberi porsi lebih besar ke aset yang masih di bawah target.</p>
+    <p class="note">Isi sesuai rencana membagi dana menurut persentase rencana. Isi sesuai rebalancing memberi porsi lebih besar ke aset yang masih di bawah target. Sisa setoran yang tidak dialokasikan otomatis masuk ke dana bebas dan bisa dipakai bulan-bulan berikutnya.</p>
   </div>
 
   <div class="card">
     <h2>Pembagian ke Aset</h2>
     <div id="splitList"></div>
-    <div class="sumline"><span>Total riil terisi</span><b id="sumActual">Rp0</b></div>
+    <div class="sumline"><span class="k">Terisi ke aset</span><b class="neutral" id="sumActual">Rp0</b></div>
+    <div class="sumline" id="kasFlowLine"><span class="k">Belum dialokasikan → dana bebas</span><b class="ok" id="kasFlow">Rp0</b></div>
     <div class="btnrow"><button class="primary" id="btnSave">Simpan setoran</button></div>
   </div>
 
@@ -308,7 +316,7 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
 
   <div class="card">
     <h2>Jual / Alihkan Aset</h2>
-    <label class="f" for="slAsset">Aset yang dijual</label>
+    <label class="f" for="slAsset">Aset yang dijual / dipindah</label>
     <select id="slAsset"></select>
     <label class="f" for="slBasis">Nilai buku yang dijual (modal)</label>
     <div class="inrow"><span class="pre">Rp</span>
@@ -347,14 +355,16 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
   <div class="card">
     <h2>Posisi vs Rencana</h2>
     <p class="sub" style="margin-bottom:10px">Nilai seharusnya dihitung dari persentase rencana dikali total portofolio saat ini (<b id="anTotal">Rp0</b>).</p>
+    <div id="anKas"></div>
     <div id="anList"></div>
   </div>
   <div class="card">
     <h2>Simulasi Setoran Berikutnya</h2>
-    <label class="f" for="simAmount">Jumlah setoran yang direncanakan</label>
+    <label class="f" for="simAmount">Jumlah yang akan dialokasikan</label>
     <div class="inrow"><span class="pre">Rp</span>
       <input type="text" id="simAmount" inputmode="numeric" placeholder="10.000.000">
     </div>
+    <div class="btnrow"><button class="small" id="btnSimKas">Pakai saldo dana bebas</button></div>
     <div id="simList" style="margin-top:10px"></div>
     <p class="note">Pembagian ini mendahulukan aset yang kekurangan agar portofolio kembali mendekati rencana tanpa perlu menjual aset yang kelebihan.</p>
   </div>
@@ -378,6 +388,7 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
     <h2>Persentase Rencana</h2>
     <div class="allocgrid" id="allocEditor"></div>
     <div class="allocsum">Total: <b id="allocSum">100%</b> <span class="sub">(harus 100%)</span></div>
+    <p class="note">Dana bebas tidak punya persentase rencana karena sifatnya penampungan sementara sebelum dialokasikan.</p>
   </div>
 
   <div class="card">
@@ -422,7 +433,7 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
 <script>
 "use strict";
 /* ---------- konstanta ---------- */
-const ASSETS = [
+const INV_ASSETS = [
   {k:"idx",  n:"Saham IDX",          c:"var(--idx)",  income:"Dividen saham IDX"},
   {k:"etf",  n:"ETF Ekuitas Global", c:"var(--etf)",  income:"Dividen ETF global"},
   {k:"sbn",  n:"SBN Ritel",          c:"var(--sbn)",  income:"Kupon SBN"},
@@ -430,7 +441,9 @@ const ASSETS = [
   {k:"rdpu", n:"Pasar Uang / RDPU",  c:"var(--rdpu)", income:"Imbal hasil RDPU"},
   {k:"emas", n:"Emas",               c:"var(--emas)", income:null}
 ];
-const A = {}; ASSETS.forEach(a=>A[a.k]=a);
+const KAS = {k:"kas", n:"Dana Bebas", c:"var(--kas)", income:null};
+const ALL_ASSETS = [...INV_ASSETS, KAS];
+const A = {}; ALL_ASSETS.forEach(a=>A[a.k]=a);
 const DEFAULT_ALLOC = {idx:38, etf:30, sbn:15, depo:7, rdpu:5, emas:5};
 const DEFAULT_TAX = {idx:10, etf:15, sbn:10, depo:20, rdpu:0};
 const TAX_LABELS = {idx:"Dividen saham IDX", etf:"Dividen ETF global", sbn:"Kupon SBN", depo:"Bunga deposito", rdpu:"Imbal hasil RDPU"};
@@ -439,13 +452,22 @@ const LS_OLD = "alokasiInvestasiV1";
 const MONTHS_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
 
 /* ---------- state ---------- */
-function zeroMap(){ const o={}; ASSETS.forEach(a=>o[a.k]=0); return o; }
+function zeroMap(){ const o={}; ALL_ASSETS.forEach(a=>o[a.k]=0); return o; }
+function invZeroMap(){ const o={}; INV_ASSETS.forEach(a=>o[a.k]=0); return o; }
 function defaultState(){
   const d = new Date();
   const ym = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
-  return {v:2, target:2000000000, years:10, start:ym,
+  return {v:3, target:2000000000, years:10, start:ym,
     alloc:{...DEFAULT_ALLOC}, tax:{...DEFAULT_TAX},
     saldoAwal:zeroMap(), entries:[], txns:[], depos:[]};
+}
+function normalizeEntry(e){
+  const actual = {...invZeroMap(), ...(e.actual||{})};
+  delete actual.kas;
+  let alokasi = 0; INV_ASSETS.forEach(a=> alokasi += actual[a.k]||0);
+  const total = (typeof e.total==="number") ? e.total : alokasi;
+  const kas = (typeof e.kas==="number") ? e.kas : total - alokasi;
+  return {id:e.id, month:e.month, actual, total, kas};
 }
 let S = load();
 function load(){
@@ -459,11 +481,9 @@ function load(){
         st.target = p.target ?? st.target;
         st.years = p.years ?? st.years;
         st.start = p.start ?? st.start;
-        if(p.alloc){ st.alloc = {...zeroMap(), ...p.alloc}; if(!("depo" in p.alloc)) st.alloc.depo = 0; }
+        if(p.alloc){ st.alloc = {...invZeroMap(), ...p.alloc}; if(!("depo" in p.alloc)) st.alloc.depo = 0; delete st.alloc.kas; }
         st.saldoAwal = {...zeroMap(), ...(p.saldoAwal||{})};
-        (p.entries||[]).forEach(e=>{
-          st.entries.push({id:e.id, month:e.month, actual:{...zeroMap(), ...e.actual}, total:e.total});
-        });
+        (p.entries||[]).forEach(e=> st.entries.push(normalizeEntry(e)));
         localStorage.setItem(LS_KEY, JSON.stringify(st));
         return st;
       }
@@ -471,13 +491,16 @@ function load(){
     }
     const p = JSON.parse(raw);
     const base = defaultState();
-    return {...base, ...p,
+    const st = {...base, ...p,
       alloc:{...base.alloc, ...(p.alloc||{})},
       tax:{...base.tax, ...(p.tax||{})},
       saldoAwal:{...base.saldoAwal, ...(p.saldoAwal||{})},
-      entries:Array.isArray(p.entries)?p.entries:[],
+      entries:(Array.isArray(p.entries)?p.entries:[]).map(normalizeEntry),
       txns:Array.isArray(p.txns)?p.txns:[],
       depos:Array.isArray(p.depos)?p.depos:[]};
+    delete st.alloc.kas;
+    st.v = 3;
+    return st;
   }catch(e){ return defaultState(); }
 }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(S)); }
@@ -517,8 +540,8 @@ function toast(msg){
 function fillAssetSelect(sel, opts){
   opts = opts || {};
   sel.innerHTML = "";
-  ASSETS.forEach(a=>{
-    if(opts.incomeOnly && !a.income) return;
+  const list = opts.incomeOnly ? INV_ASSETS.filter(a=>a.income) : ALL_ASSETS;
+  list.forEach(a=>{
     const o = document.createElement("option");
     o.value = a.k;
     o.textContent = opts.incomeOnly ? a.income : a.n;
@@ -535,8 +558,11 @@ function fillAssetSelect(sel, opts){
 /* ---------- perhitungan inti ---------- */
 function holdings(){
   const h = zeroMap();
-  ASSETS.forEach(a=> h[a.k] += S.saldoAwal[a.k]||0);
-  S.entries.forEach(e=> ASSETS.forEach(a=> h[a.k] += e.actual[a.k]||0));
+  ALL_ASSETS.forEach(a=> h[a.k] += S.saldoAwal[a.k]||0);
+  S.entries.forEach(e=>{
+    INV_ASSETS.forEach(a=> h[a.k] += e.actual[a.k]||0);
+    h.kas += e.kas||0;
+  });
   S.txns.forEach(t=>{
     if(t.type==="income"){ h[t.toAsset] += t.net; }
     else if(t.type==="jual"){ h[t.asset] -= t.basis; h[t.toAsset] += t.net; }
@@ -549,7 +575,7 @@ function holdings(){
 }
 function totals(){
   let kontribusi = 0, pasif = 0, pl = 0;
-  ASSETS.forEach(a=> kontribusi += S.saldoAwal[a.k]||0);
+  ALL_ASSETS.forEach(a=> kontribusi += S.saldoAwal[a.k]||0);
   S.entries.forEach(e=> kontribusi += e.total);
   S.txns.forEach(t=>{
     if(t.type==="income") pasif += t.net;
@@ -558,28 +584,37 @@ function totals(){
   });
   return {kontribusi, pasif, pl};
 }
-function totalNow(){ const h=holdings(); return ASSETS.reduce((s,a)=>s+h[a.k],0); }
+function totalNow(){ const h=holdings(); return ALL_ASSETS.reduce((s,a)=>s+h[a.k],0); }
+function kasAvailable(excludeMonth){
+  let k = holdings().kas;
+  if(excludeMonth){
+    const e = S.entries.find(x=>x.month===excludeMonth);
+    if(e) k -= e.kas||0;
+  }
+  return k;
+}
 function planSplit(amount, alloc){
   alloc = alloc || S.alloc;
   const out={}; let acc=0;
-  ASSETS.forEach((a,i)=>{
-    if(i===ASSETS.length-1){ out[a.k]=amount-acc; }
+  INV_ASSETS.forEach((a,i)=>{
+    if(i===INV_ASSETS.length-1){ out[a.k]=amount-acc; }
     else{ out[a.k]=Math.round(amount*alloc[a.k]/100); acc+=out[a.k]; }
   });
   return out;
 }
 function rebalanceSplit(amount){
   const h = holdings();
-  const after = totalNow()+amount;
+  const invTotal = INV_ASSETS.reduce((s,a)=>s+h[a.k],0);
+  const after = invTotal+amount;
   let gaps={}, sum=0;
-  ASSETS.forEach(a=>{
+  INV_ASSETS.forEach(a=>{
     const g = Math.max(0, after*S.alloc[a.k]/100 - h[a.k]);
     gaps[a.k]=g; sum+=g;
   });
   if(sum<=0) return planSplit(amount);
   const out={}; let acc=0;
-  ASSETS.forEach((a,i)=>{
-    if(i===ASSETS.length-1){ out[a.k]=amount-acc; }
+  INV_ASSETS.forEach((a,i)=>{
+    if(i===INV_ASSETS.length-1){ out[a.k]=amount-acc; }
     else{ out[a.k]=Math.round(amount*gaps[a.k]/sum); acc+=out[a.k]; }
   });
   return out;
@@ -610,6 +645,7 @@ function processMaturities(){
 /* ---------- BERANDA ---------- */
 function renderHome(){
   const total = totalNow();
+  const h = holdings();
   const {kontribusi, pasif, pl} = totals();
   const pct = S.target>0 ? total/S.target*100 : 0;
   $("#vTarget").textContent = fmt(S.target);
@@ -631,13 +667,13 @@ function renderHome(){
   const plEl = $("#vPL");
   plEl.textContent = fmtS(pl);
   plEl.className = "v "+(pl>0?"pos":pl<0?"neg":"");
+  $("#vKas").textContent = fmt(h.kas);
   const pasifBln = pasif/Math.max(1,nM);
   $("#vPasifBln").textContent = "+"+fmt(pasifBln);
   $("#vNeedNet").textContent = fmt(Math.max(0, need-pasifBln));
 
-  const h = holdings();
   const box = $("#homeAlloc"); box.innerHTML = "";
-  ASSETS.forEach(a=>{
+  INV_ASSETS.forEach(a=>{
     const real = total>0 ? h[a.k]/total*100 : 0;
     const plan = S.alloc[a.k];
     const maxRef = Math.max(plan, real, 1);
@@ -653,13 +689,24 @@ function renderHome(){
       '<div class="barlabels"><span>Riil '+fmt(h[a.k])+'</span><span>Seharusnya '+fmt(total*plan/100)+'</span></div>';
     box.appendChild(row);
   });
+  if(h.kas > 0){
+    const real = total>0 ? h.kas/total*100 : 0;
+    const row = document.createElement("div");
+    row.className = "arow";
+    row.innerHTML =
+      '<div class="top"><span class="name"><span class="dot" style="background:var(--kas)"></span>Dana Bebas</span>'+
+      '<span class="pcts"><b>'+pct1(real)+'</b> <span>/ -</span></span></div>'+
+      '<div class="bars"><div class="bar real"><i style="width:'+Math.min(real,100)+'%;background:var(--kas)"></i></div></div>'+
+      '<div class="barlabels"><span>Riil '+fmt(h.kas)+'</span><span>Belum dialokasikan</span></div>';
+    box.appendChild(row);
+  }
 }
 
 /* ---------- SETORAN ---------- */
 let splitInputs = {};
 function buildSplitList(){
   const box = $("#splitList"); box.innerHTML=""; splitInputs={};
-  ASSETS.forEach(a=>{
+  INV_ASSETS.forEach(a=>{
     const row = document.createElement("div");
     row.className = "splitrow";
     row.innerHTML =
@@ -675,40 +722,72 @@ function buildSplitList(){
     splitInputs[a.k]=inp;
   });
 }
-function updatePlanPreview(){
+function fillBase(){
   const amt = parseNum($("#inAmount").value);
-  const sp = planSplit(amt);
-  ASSETS.forEach(a=> $("#plan-"+a.k).textContent = "Rencana "+fmt(sp[a.k]));
+  const useKas = $("#useKas").checked;
+  const avail = Math.max(0, kasAvailable($("#inMonth").value));
+  return amt + (useKas ? avail : 0);
+}
+function updatePlanPreview(){
+  const sp = planSplit(fillBase());
+  INV_ASSETS.forEach(a=> $("#plan-"+a.k).textContent = "Rencana "+fmt(sp[a.k]));
   updateSum();
 }
 function updateSum(){
   const amt = parseNum($("#inAmount").value);
-  let s=0; ASSETS.forEach(a=> s+=parseNum(splitInputs[a.k].value));
-  const el = $("#sumActual");
-  el.textContent = fmt(s)+(amt?" dari "+fmt(amt):"");
-  el.className = (amt && s!==amt)?"bad":"ok";
+  let s=0; INV_ASSETS.forEach(a=> s+=parseNum(splitInputs[a.k].value));
+  $("#sumActual").textContent = fmt(s);
+  $("#kasAvail").textContent = fmt(Math.max(0, kasAvailable($("#inMonth").value)));
+
+  const delta = amt - s;
+  const line = $("#kasFlowLine");
+  const flow = $("#kasFlow");
+  if(delta >= 0){
+    line.firstElementChild.textContent = "Belum dialokasikan → dana bebas";
+    flow.textContent = "+"+fmt(delta);
+    flow.className = "ok";
+  }else{
+    const need = -delta;
+    const avail = Math.max(0, kasAvailable($("#inMonth").value));
+    line.firstElementChild.textContent = "Dipakai dari dana bebas";
+    flow.textContent = fmt(need)+" (tersedia "+fmt(avail)+")";
+    flow.className = need<=avail ? "ok" : "bad";
+  }
 }
 function fillInputs(map){
-  ASSETS.forEach(a=> splitInputs[a.k].value = map[a.k]?map[a.k].toLocaleString("id-ID"):"");
+  INV_ASSETS.forEach(a=> splitInputs[a.k].value = map[a.k]?map[a.k].toLocaleString("id-ID"):"");
   updateSum();
 }
 function saveEntry(){
   const ym = $("#inMonth").value;
   if(!ym){ toast("Pilih bulan dulu"); return; }
-  const actual = {}; let tot=0;
-  ASSETS.forEach(a=>{ actual[a.k]=parseNum(splitInputs[a.k].value); tot+=actual[a.k]; });
-  if(tot<=0){ toast("Isi jumlah riil minimal satu aset"); return; }
+  const amt = parseNum($("#inAmount").value);
+  const actual = {}; let alokasi=0;
+  INV_ASSETS.forEach(a=>{ actual[a.k]=parseNum(splitInputs[a.k].value); alokasi+=actual[a.k]; });
+  if(amt<=0 && alokasi<=0){ toast("Isi jumlah setoran atau alokasi ke aset"); return; }
+  const kasDelta = amt - alokasi;
+  if(kasDelta < 0){
+    const avail = Math.max(0, kasAvailable(ym));
+    if(-kasDelta > avail){
+      toast("Dana bebas tidak cukup. Dipakai "+fmt(-kasDelta)+", tersedia "+fmt(avail));
+      return;
+    }
+  }
   const ix = S.entries.findIndex(e=>e.month===ym);
+  const entry = {id: ix>=0 ? S.entries[ix].id : Date.now(), month:ym, actual, total:amt, kas:kasDelta};
   if(ix>=0){
     if(!confirm("Setoran bulan "+ymLabel(ym)+" sudah ada. Timpa dengan data baru?")) return;
-    S.entries[ix] = {id:S.entries[ix].id, month:ym, actual, total:tot};
+    S.entries[ix] = entry;
   }else{
-    S.entries.push({id:Date.now(), month:ym, actual, total:tot});
+    S.entries.push(entry);
   }
   S.entries.sort((a,b)=> a.month<b.month?-1:1);
   save(); renderAll();
   $("#inAmount").value=""; fillInputs({}); updatePlanPreview();
-  toast("Setoran "+ymLabel(ym)+" tersimpan");
+  let msg = "Setoran "+ymLabel(ym)+" tersimpan";
+  if(kasDelta>0) msg += ". "+fmt(kasDelta)+" masuk dana bebas";
+  else if(kasDelta<0) msg += ". "+fmt(-kasDelta)+" diambil dari dana bebas";
+  toast(msg);
   switchPage("home");
 }
 function renderHistory(){
@@ -718,9 +797,15 @@ function renderHistory(){
     const det = document.createElement("details");
     det.className="hitem";
     let rows="";
-    ASSETS.forEach(a=>{ rows+='<div class="r2"><span>'+a.n+'</span><span>'+fmt(e.actual[a.k]||0)+'</span></div>'; });
+    INV_ASSETS.forEach(a=>{ rows+='<div class="r2"><span>'+a.n+'</span><span>'+fmt(e.actual[a.k]||0)+'</span></div>'; });
+    const kasTxt = e.kas>0 ? '+'+fmt(e.kas)+' ke dana bebas'
+                 : e.kas<0 ? fmt(-e.kas)+' dari dana bebas' : '-';
+    rows += '<div class="r2"><span>Dana bebas</span><span>'+kasTxt+'</span></div>';
+    const alokasi = e.total - e.kas;
     det.innerHTML =
-      '<summary><span class="l">'+ymLabel(e.month)+'</span><span class="r">'+fmt(e.total)+'</span></summary>'+
+      '<summary><span class="l">'+ymLabel(e.month)+
+      '<small>Dialokasikan '+fmt(alokasi)+'</small></span>'+
+      '<span class="r">'+fmt(e.total)+'<small>setoran</small></span></summary>'+
       '<div class="detail">'+rows+
       '<div class="btnrow"><button class="danger small" data-del="'+e.id+'">Hapus setoran ini</button></div></div>';
     box.appendChild(det);
@@ -787,6 +872,7 @@ function renderDepos(){
     const {net} = depoInterest(dp);
     const det = document.createElement("details");
     det.className="hitem";
+    const sumberTxt = dp.sumber==="__baru" ? "Dana baru" : A[dp.sumber].n;
     det.innerHTML =
       '<summary><span class="l">'+(dp.name||"Deposito")+
       '<small>'+dp.rate.toLocaleString("id-ID")+'% p.a. · '+dp.tenor+' bln · JT '+dLabel(dp.matDate)+'</small></span>'+
@@ -795,7 +881,7 @@ function renderDepos(){
       '<div class="detail">'+
       '<div class="r2"><span>Mulai</span><span>'+dLabel(dp.startDate)+'</span></div>'+
       '<div class="r2"><span>Bunga neto (pajak '+S.tax.depo+'%)</span><span class="pl-pos">+'+fmt(net)+'</span></div>'+
-      '<div class="r2"><span>Sumber dana</span><span>'+(dp.sumber==="__baru"?"Dana baru":A[dp.sumber].n)+'</span></div>'+
+      '<div class="r2"><span>Sumber dana</span><span>'+sumberTxt+'</span></div>'+
       '<div class="btnrow"><button class="danger small" data-deldp="'+dp.id+'">Hapus deposito ini</button></div></div>';
     box.appendChild(det);
   });
@@ -927,9 +1013,16 @@ function renderTxns(){
 function renderAnalysis(){
   const total = totalNow(); const h = holdings();
   $("#anTotal").textContent = fmt(total);
+  const kasBox = $("#anKas");
+  kasBox.innerHTML = h.kas>0
+    ? '<div class="diffcard"><div class="l1"><span class="name"><span class="dot" style="background:var(--kas);display:inline-block;margin-right:7px"></span><b>Dana Bebas</b></span>'+
+      '<span class="badge kas">Menunggu alokasi</span></div>'+
+      '<div class="nums"><div><div class="k">Tersedia</div>'+fmt(h.kas)+'</div>'+
+      '<div><div class="k">Saran</div>Alokasikan lewat simulasi di bawah</div></div></div>'
+    : "";
   const box = $("#anList"); box.innerHTML="";
   if(total<=0){ box.innerHTML='<p class="empty">Belum ada data. Catat setoran pertama Anda.</p>'; }
-  ASSETS.forEach(a=>{
+  INV_ASSETS.forEach(a=>{
     if(total<=0) return;
     const real = h[a.k], should = total*S.alloc[a.k]/100;
     const diff = real-should;
@@ -957,7 +1050,7 @@ function renderSim(){
   const box = $("#simList"); box.innerHTML="";
   if(!amt){ box.innerHTML='<p class="empty">Masukkan jumlah untuk melihat pembagiannya.</p>'; return; }
   const sp = rebalanceSplit(amt);
-  ASSETS.forEach(a=>{
+  INV_ASSETS.forEach(a=>{
     const r = document.createElement("div");
     r.className="splitrow";
     r.innerHTML='<div class="head"><span class="name"><span class="dot" style="background:'+a.c+';display:inline-block;margin-right:7px"></span>'+a.n+'</span><b>'+fmt(sp[a.k])+'</b></div>';
@@ -969,7 +1062,7 @@ function renderSim(){
 let allocInputs={}, saldoInputs={}, taxInputs={};
 function buildSettings(){
   const ae = $("#allocEditor"); ae.innerHTML=""; allocInputs={};
-  ASSETS.forEach(a=>{
+  INV_ASSETS.forEach(a=>{
     const nm = document.createElement("div");
     nm.className="an";
     nm.innerHTML='<span class="dot" style="background:'+a.c+'"></span>'+a.n;
@@ -991,9 +1084,9 @@ function buildSettings(){
     taxInputs[k]=inp;
   });
   const se = $("#saldoEditor"); se.innerHTML=""; saldoInputs={};
-  ASSETS.forEach(a=>{
+  ALL_ASSETS.forEach(a=>{
     const lab = document.createElement("label");
-    lab.className="f"; lab.textContent=a.n;
+    lab.className="f"; lab.textContent = a.k==="kas" ? "Dana Bebas (kas menganggur)" : a.n;
     const wrap = document.createElement("div");
     wrap.className="inrow"; wrap.innerHTML='<span class="pre">Rp</span>';
     const inp = document.createElement("input");
@@ -1008,15 +1101,15 @@ function fillSettings(){
   $("#setTarget").value = S.target.toLocaleString("id-ID");
   $("#setYears").value = S.years;
   $("#setStart").value = S.start;
-  ASSETS.forEach(a=>{
-    allocInputs[a.k].value = S.alloc[a.k];
+  INV_ASSETS.forEach(a=>{ allocInputs[a.k].value = S.alloc[a.k]; });
+  ALL_ASSETS.forEach(a=>{
     saldoInputs[a.k].value = S.saldoAwal[a.k]?S.saldoAwal[a.k].toLocaleString("id-ID"):"";
   });
   Object.keys(DEFAULT_TAX).forEach(k=> taxInputs[k].value = S.tax[k]);
   updateAllocSum();
 }
 function allocSumVal(){
-  let s=0; ASSETS.forEach(a=> s+=parseDec(allocInputs[a.k].value));
+  let s=0; INV_ASSETS.forEach(a=> s+=parseDec(allocInputs[a.k].value));
   return Math.round(s*100)/100;
 }
 function updateAllocSum(){
@@ -1033,12 +1126,10 @@ function saveSettings(){
   if(allocSumVal()!==100){ toast("Total persentase rencana harus tepat 100%"); return; }
   S.target=t; S.years=y;
   S.start = $("#setStart").value || S.start;
-  ASSETS.forEach(a=>{
-    S.alloc[a.k]=parseDec(allocInputs[a.k].value);
-    S.saldoAwal[a.k]=parseNum(saldoInputs[a.k].value);
-  });
+  INV_ASSETS.forEach(a=>{ S.alloc[a.k]=parseDec(allocInputs[a.k].value); });
+  ALL_ASSETS.forEach(a=>{ S.saldoAwal[a.k]=parseNum(saldoInputs[a.k].value); });
   Object.keys(DEFAULT_TAX).forEach(k=> S.tax[k]=parseDec(taxInputs[k].value));
-  save(); renderAll(); updateDepoPreview(); syncPvTax();
+  save(); renderAll(); updateDepoPreview(); syncPvTax(); updateSum();
   toast("Pengaturan tersimpan");
 }
 function exportData(){
@@ -1055,11 +1146,14 @@ function importData(file){
       const p = JSON.parse(r.result);
       if(!p || typeof p!=="object" || !p.alloc) throw 0;
       S = {...defaultState(), ...p,
-        alloc:{...zeroMap(), ...p.alloc},
+        alloc:{...invZeroMap(), ...p.alloc},
         tax:{...DEFAULT_TAX, ...(p.tax||{})},
         saldoAwal:{...zeroMap(), ...(p.saldoAwal||{})}};
       if(!("depo" in (p.alloc||{}))) S.alloc.depo = 0;
-      S.entries = (p.entries||[]).map(e=>({...e, actual:{...zeroMap(), ...e.actual}}));
+      delete S.alloc.kas;
+      S.entries = (p.entries||[]).map(normalizeEntry);
+      S.txns = Array.isArray(p.txns)?p.txns:[];
+      S.depos = Array.isArray(p.depos)?p.depos:[];
       save(); fillSettings(); renderAll(); toast("Data berhasil diimpor");
     }catch(e){ toast("File tidak valid"); }
   };
@@ -1074,7 +1168,7 @@ function switchPage(p){
     b.classList.toggle("on", b.dataset.page===p));
   window.scrollTo({top:0});
 }
-function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderTxns(); renderAnalysis(); }
+function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderTxns(); renderAnalysis(); updateSum(); }
 function syncPvTax(){
   const a = $("#pvAsset").value;
   $("#pvTax").value = (S.tax[a] ?? 0);
@@ -1091,7 +1185,7 @@ fillAssetSelect($("#pvAsset"), {incomeOnly:true});
 fillAssetSelect($("#pvTo"));
 fillAssetSelect($("#slAsset"));
 fillAssetSelect($("#slTo"));
-$("#slTo").value = "rdpu";
+$("#slTo").value = "kas";
 
 const now = new Date();
 $("#inMonth").value = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
@@ -1101,7 +1195,15 @@ $("#pvDate").value = todayISO();
 $("#slDate").value = todayISO();
 
 bindMoney($("#inAmount"), updatePlanPreview);
+$("#inMonth").addEventListener("input", updatePlanPreview);
+$("#useKas").addEventListener("change", updatePlanPreview);
 bindMoney($("#simAmount"), renderSim);
+$("#btnSimKas").addEventListener("click", ()=>{
+  const k = Math.max(0, holdings().kas);
+  if(k<=0){ toast("Dana bebas kosong"); return; }
+  $("#simAmount").value = k.toLocaleString("id-ID");
+  renderSim();
+});
 bindMoney($("#dpPokok"), updateDepoPreview);
 $("#dpRate").addEventListener("input", updateDepoPreview);
 $("#dpTenor").addEventListener("input", updateDepoPreview);
@@ -1115,14 +1217,14 @@ bindMoney($("#slTax"), updateSlPreview);
 $("#slAsset").addEventListener("change", prefillSaleTax);
 
 $("#btnFillPlan").addEventListener("click", ()=>{
-  const amt = parseNum($("#inAmount").value);
-  if(!amt){ toast("Isi jumlah setoran dulu"); return; }
-  fillInputs(planSplit(amt));
+  const base = fillBase();
+  if(base<=0){ toast("Isi jumlah setoran atau centang dana bebas"); return; }
+  fillInputs(planSplit(base));
 });
 $("#btnFillRebal").addEventListener("click", ()=>{
-  const amt = parseNum($("#inAmount").value);
-  if(!amt){ toast("Isi jumlah setoran dulu"); return; }
-  fillInputs(rebalanceSplit(amt));
+  const base = fillBase();
+  if(base<=0){ toast("Isi jumlah setoran atau centang dana bebas"); return; }
+  fillInputs(rebalanceSplit(base));
 });
 $("#btnSave").addEventListener("click", saveEntry);
 $("#btnDepoSave").addEventListener("click", saveDepo);
