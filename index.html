@@ -346,6 +346,28 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
   </div>
 
   <div class="card">
+    <h2>Kelola Dana Bebas</h2>
+    <div class="kasbanner"><span class="k">Saldo dana bebas saat ini</span><b id="kasNow">Rp0</b></div>
+    <div class="seg" style="margin-top:12px">
+      <button id="segSet" class="on" data-mode="set">Atur ke nilai</button>
+      <button id="segAdj" data-mode="adj">Tambah / kurangi</button>
+    </div>
+    <label class="f" id="kasLabel" for="kasInput">Saldo dana bebas baru</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="kasInput" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="calcline"><span class="k">Perubahan</span><b id="kasDelta">Rp0</b></div>
+    <div class="calcline"><span class="k">Saldo setelah penyesuaian</span><b id="kasAfter">Rp0</b></div>
+    <label class="f" for="kasNote">Catatan (opsional)</label>
+    <input type="text" id="kasNote" placeholder="Contoh: koreksi saldo, dana terpakai di luar app">
+    <div class="btnrow">
+      <button class="primary" id="btnKasSave">Simpan penyesuaian</button>
+      <button class="danger" id="btnKasZero">Nolkan dana bebas</button>
+    </div>
+    <p class="note">Penyesuaian tercatat sebagai transaksi tersendiri sehingga bisa dilihat dan dihapus di Riwayat Transaksi. Saldo dana bebas tidak boleh negatif.</p>
+  </div>
+
+  <div class="card">
     <h2>Riwayat Transaksi</h2>
     <div id="txnList"></div>
   </div>
@@ -631,6 +653,7 @@ function holdings(){
       else { h[t.asset] -= t.gross; h.depo += t.gross; }
     }
     else if(t.type==="matur"){ h.depo -= t.pokok; h[t.toAsset||"kas"] += t.pokok; }
+    else if(t.type==="adjust"){ h[t.toAsset||"kas"] += t.net; }
   });
   return h;
 }
@@ -1067,6 +1090,63 @@ function saveSl(){
   toast("Penjualan tercatat, untung/rugi "+fmtS(net-basis));
 }
 
+/* ---------- KELOLA DANA BEBAS ---------- */
+let kasMode = "set";
+function updateKasPreview(){
+  const now = holdings().kas;
+  const input = parseNum($("#kasInput").value);
+  let delta, after;
+  if(kasMode==="set"){ after = input; delta = input - now; }
+  else{ delta = input; after = now + input; }
+  $("#kasNow").textContent = fmt(now);
+  const dEl = $("#kasDelta");
+  dEl.textContent = fmtS(delta);
+  dEl.className = delta>0?"pos":delta<0?"neg":"";
+  const aEl = $("#kasAfter");
+  aEl.textContent = fmt(after);
+  aEl.className = after<0?"neg":"pos";
+}
+function setKasMode(m){
+  kasMode = m;
+  $("#segSet").classList.toggle("on", m==="set");
+  $("#segAdj").classList.toggle("on", m==="adj");
+  $("#kasLabel").textContent = m==="set" ? "Saldo dana bebas baru" : "Jumlah tambah (+) atau kurangi (-)";
+  updateKasPreview();
+}
+function saveKasAdjust(){
+  const now = holdings().kas;
+  const input = parseNum($("#kasInput").value);
+  let delta;
+  if(kasMode==="set"){ delta = input - now; }
+  else{
+    // mode tambah/kurangi: baca tanda dari teks agar bisa negatif
+    const raw = String($("#kasInput").value).trim();
+    const sign = raw.startsWith("-") ? -1 : 1;
+    delta = sign * input;
+  }
+  if(delta===0){ toast("Tidak ada perubahan"); return; }
+  if(now + delta < 0){ toast("Saldo dana bebas tidak boleh negatif. Maksimal dikurangi "+fmt(now)); return; }
+  const note = $("#kasNote").value.trim() || (delta>0?"Penambahan dana bebas manual":"Pengurangan dana bebas manual");
+  S.txns.push({id:Date.now()+Math.random(), date:todayISO(), type:"adjust",
+    asset:"kas", toAsset:"kas", gross:Math.abs(delta), tax:0, net:delta, basis:0, pl:0,
+    note:"Penyesuaian dana bebas: "+note});
+  save(); renderAll();
+  $("#kasInput").value=""; $("#kasNote").value=""; updateKasPreview();
+  toast("Dana bebas disesuaikan "+fmtS(delta));
+}
+function zeroKas(){
+  const now = holdings().kas;
+  if(now===0){ toast("Dana bebas sudah nol"); return; }
+  if(!confirm("Nolkan dana bebas dari "+fmt(now)+" menjadi Rp0?")) return;
+  const note = $("#kasNote").value.trim() || "Dana bebas dinolkan";
+  S.txns.push({id:Date.now()+Math.random(), date:todayISO(), type:"adjust",
+    asset:"kas", toAsset:"kas", gross:now, tax:0, net:-now, basis:0, pl:0,
+    note:"Penyesuaian dana bebas: "+note});
+  save(); renderAll();
+  $("#kasInput").value=""; $("#kasNote").value=""; updateKasPreview();
+  toast("Dana bebas dinolkan");
+}
+
 /* ---------- RIWAYAT TRANSAKSI ---------- */
 function renderTxns(){
   const box = $("#txnList"); box.innerHTML="";
@@ -1090,6 +1170,10 @@ function renderTxns(){
         '<div class="r2"><span>Hasil bruto</span><span>'+fmt(t.gross)+'</span></div>'+
         '<div class="r2"><span>Pajak</span><span>-'+fmt(t.tax)+'</span></div>'+
         '<div class="r2"><span>Neto masuk '+A[t.toAsset].n+'</span><span>'+fmt(t.net)+'</span></div>';
+    }else if(t.type==="adjust"){
+      title = t.note || "Penyesuaian dana bebas";
+      amount = '<span class="'+(t.net>=0?"pl-pos":"pl-neg")+'">'+fmtS(t.net)+'</span>';
+      detail = '<div class="r2"><span>Sasaran</span><span>Dana Bebas</span></div>';
     }else{
       title = t.note;
       amount = fmt(t.gross);
@@ -1285,7 +1369,7 @@ function switchPage(p){
     b.classList.toggle("on", b.dataset.page===p));
   window.scrollTo({top:0});
 }
-function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderTxns(); renderAnalysis(); updateSum(); }
+function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderTxns(); renderAnalysis(); updateSum(); if(typeof updateKasPreview==="function") updateKasPreview(); }
 function syncPvTax(){
   const a = $("#pvAsset").value;
   $("#pvTax").value = (S.tax[a] ?? 0);
@@ -1347,6 +1431,18 @@ $("#btnSave").addEventListener("click", saveEntry);
 $("#btnDepoSave").addEventListener("click", saveDepo);
 $("#btnPvSave").addEventListener("click", savePv);
 $("#btnSlSave").addEventListener("click", saveSl);
+$("#kasInput").addEventListener("input", ()=>{
+  const el = $("#kasInput");
+  const neg = kasMode==="adj" && String(el.value).trim().startsWith("-");
+  const n = parseNum(el.value);
+  el.value = (n ? n.toLocaleString("id-ID") : "");
+  if(neg && n) el.value = "-"+el.value;
+  updateKasPreview();
+});
+$("#segSet").addEventListener("click", ()=>setKasMode("set"));
+$("#segAdj").addEventListener("click", ()=>setKasMode("adj"));
+$("#btnKasSave").addEventListener("click", saveKasAdjust);
+$("#btnKasZero").addEventListener("click", zeroKas);
 $("#btnSaveSet").addEventListener("click", saveSettings);
 $("#btnExport").addEventListener("click", exportData);
 $("#btnImport").addEventListener("click", ()=>$("#fileImport").click());
