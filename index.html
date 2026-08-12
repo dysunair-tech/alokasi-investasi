@@ -232,6 +232,7 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
     <div class="inrow"><span class="pre">Rp</span>
       <input type="text" id="inAmount" inputmode="numeric" placeholder="10.000.000">
     </div>
+    <p class="note" id="monthHint" style="display:none"></p>
     <div class="kasbanner"><span class="k">Dana bebas tersedia</span><b id="kasAvail">Rp0</b></div>
     <label class="chk"><input type="checkbox" id="useKas">Ikutkan dana bebas dalam pembagian otomatis</label>
     <div class="btnrow">
@@ -457,17 +458,57 @@ function invZeroMap(){ const o={}; INV_ASSETS.forEach(a=>o[a.k]=0); return o; }
 function defaultState(){
   const d = new Date();
   const ym = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
-  return {v:3, target:2000000000, years:10, start:ym,
+  return {v:4, target:2000000000, years:10, start:ym,
     alloc:{...DEFAULT_ALLOC}, tax:{...DEFAULT_TAX},
     saldoAwal:zeroMap(), entries:[], txns:[], depos:[]};
 }
+function recomputeEntry(e){
+  const actual = invZeroMap();
+  let total=0, kas=0;
+  e.parts.forEach(p=>{
+    INV_ASSETS.forEach(a=> actual[a.k] += p.actual[a.k]||0);
+    total += p.amount||0;
+    kas += p.kas||0;
+  });
+  e.actual = actual; e.total = total; e.kas = kas;
+  return e;
+}
 function normalizeEntry(e){
-  const actual = {...invZeroMap(), ...(e.actual||{})};
-  delete actual.kas;
-  let alokasi = 0; INV_ASSETS.forEach(a=> alokasi += actual[a.k]||0);
-  const total = (typeof e.total==="number") ? e.total : alokasi;
-  const kas = (typeof e.kas==="number") ? e.kas : total - alokasi;
-  return {id:e.id, month:e.month, actual, total, kas};
+  let parts;
+  if(Array.isArray(e.parts) && e.parts.length){
+    parts = e.parts.map(p=>{
+      const actual = invZeroMap();
+      INV_ASSETS.forEach(a=> actual[a.k] = (p.actual && p.actual[a.k])||0);
+      let alok=0; INV_ASSETS.forEach(a=> alok+=actual[a.k]);
+      const kas = (typeof p.kas==="number") ? p.kas : (p.amount||0)-alok;
+      return {id: p.id || (Date.now()+Math.random()), amount:p.amount||0, actual, kas};
+    });
+  }else{
+    const actual = invZeroMap();
+    INV_ASSETS.forEach(a=> actual[a.k] = (e.actual && e.actual[a.k])||0);
+    let alokasi=0; INV_ASSETS.forEach(a=> alokasi+=actual[a.k]);
+    const total = (typeof e.total==="number") ? e.total : alokasi;
+    const kas = (typeof e.kas==="number") ? e.kas : total-alokasi;
+    parts = [{id: e.id || (Date.now()+Math.random()), amount:total, actual, kas}];
+  }
+  return recomputeEntry({id: e.id || (Date.now()+Math.random()), month:e.month, parts});
+}
+function migrateDepoTxns(txns, depos){
+  // data lama: bunga jatuh tempo masuk ke depo dan pokok tetap di depo, sehingga menggelembung.
+  // konversi: bunga neto dialihkan ke dana bebas, dan pokok dikeluarkan dari depo lewat txn matur.
+  const add=[];
+  (txns||[]).forEach(t=>{
+    if(t.type==="income" && t.depoId && t.toAsset==="depo"){
+      t.toAsset="kas";
+      const dp=(depos||[]).find(d=>d.id===t.depoId);
+      const pokok = dp?dp.pokok:0;
+      add.push({id:Date.now()+Math.random(), date:t.date, type:"matur",
+        asset:"depo", toAsset:"kas", pokok, gross:pokok, tax:0, net:pokok,
+        basis:0, pl:0, depoId:t.depoId, note:"Pokok deposito cair kembali ke dana bebas"});
+    }
+  });
+  txns.push(...add);
+  return txns;
 }
 let S = load();
 function load(){
@@ -499,7 +540,25 @@ function load(){
       txns:Array.isArray(p.txns)?p.txns:[],
       depos:Array.isArray(p.depos)?p.depos:[]};
     delete st.alloc.kas;
-    st.v = 3;
+    // migrasi v4: deposito cair lama harus mengembalikan pokok+bunga ke dana bebas
+    if((p.v||1) < 4){
+      st.depos.forEach(dp=>{
+        if(dp.status!=="cair") return;
+        // bunga cair lama masuk ke depo, alihkan ke kas
+        st.txns.forEach(t=>{
+          if(t.depoId===dp.id && t.type==="income" && t.toAsset==="depo") t.toAsset="kas";
+        });
+        // tambahkan pengembalian pokok ke kas bila belum ada dan pokok memang pernah masuk depo
+        const punyaMatur = st.txns.some(t=>t.depoId===dp.id && t.type==="matur");
+        if(!punyaMatur && dp.sumber!=="depo"){
+          st.txns.push({id:Date.now()+Math.random(), date:dp.matDate, type:"matur",
+            asset:"depo", toAsset:"kas", pokok:dp.pokok, gross:dp.pokok, tax:0,
+            net:dp.pokok, basis:0, pl:0, depoId:dp.id,
+            note:"Pokok deposito cair kembali ke dana bebas"+(dp.name?" ("+dp.name+")":"")});
+        }
+      });
+    }
+    st.v = 4;
     return st;
   }catch(e){ return defaultState(); }
 }
@@ -540,7 +599,8 @@ function toast(msg){
 function fillAssetSelect(sel, opts){
   opts = opts || {};
   sel.innerHTML = "";
-  const list = opts.incomeOnly ? INV_ASSETS.filter(a=>a.income) : ALL_ASSETS;
+  let list = opts.incomeOnly ? INV_ASSETS.filter(a=>a.income) : ALL_ASSETS;
+  if(opts.exclude) list = list.filter(a=>!opts.exclude.includes(a.k));
   list.forEach(a=>{
     const o = document.createElement("option");
     o.value = a.k;
@@ -570,6 +630,7 @@ function holdings(){
       if(t.asset==="__baru"){ h.depo += t.gross; }
       else { h[t.asset] -= t.gross; h.depo += t.gross; }
     }
+    else if(t.type==="matur"){ h.depo -= t.pokok; h[t.toAsset||"kas"] += t.pokok; }
   });
   return h;
 }
@@ -585,13 +646,9 @@ function totals(){
   return {kontribusi, pasif, pl};
 }
 function totalNow(){ const h=holdings(); return ALL_ASSETS.reduce((s,a)=>s+h[a.k],0); }
-function kasAvailable(excludeMonth){
-  let k = holdings().kas;
-  if(excludeMonth){
-    const e = S.entries.find(x=>x.month===excludeMonth);
-    if(e) k -= e.kas||0;
-  }
-  return k;
+function kasAvailable(){
+  // saldo dana bebas saat ini. setoran baru diakumulasi, jadi tidak perlu mengecualikan bulan
+  return holdings().kas;
 }
 function planSplit(amount, alloc){
   alloc = alloc || S.alloc;
@@ -632,14 +689,21 @@ function processMaturities(){
   S.depos.forEach(dp=>{
     if(dp.status==="aktif" && dp.matDate <= today){
       const {bruto, tax, net} = depoInterest(dp);
+      const nm = dp.name?" ("+dp.name+")":"";
+      // bunga neto masuk ke dana bebas sebagai pendapatan pasif
       S.txns.push({id:Date.now()+Math.random(), date:dp.matDate, type:"income",
-        asset:"depo", toAsset:"depo", gross:Math.round(bruto), tax:Math.round(tax),
+        asset:"depo", toAsset:"kas", gross:Math.round(bruto), tax:Math.round(tax),
         net:Math.round(net), basis:0, pl:0, depoId:dp.id,
-        note:"Bunga deposito jatuh tempo"+(dp.name?" ("+dp.name+")":"")});
+        note:"Bunga deposito jatuh tempo"+nm});
+      // pokok kembali dari deposito ke dana bebas, deposito tidak lagi dihitung aktif
+      S.txns.push({id:Date.now()+Math.random(), date:dp.matDate, type:"matur",
+        asset:"depo", toAsset:"kas", pokok:dp.pokok, gross:dp.pokok, tax:0,
+        net:dp.pokok, basis:0, pl:0, depoId:dp.id,
+        note:"Pokok deposito cair kembali ke dana bebas"+nm});
       dp.status="cair"; n++; sum+=net;
     }
   });
-  if(n){ save(); toast(n+" deposito jatuh tempo. Bunga neto "+fmt(sum)+" tercatat otomatis."); }
+  if(n){ save(); toast(n+" deposito jatuh tempo. Pokok dan bunga neto "+fmt(sum)+" masuk dana bebas."); }
 }
 
 /* ---------- BERANDA ---------- */
@@ -725,19 +789,32 @@ function buildSplitList(){
 function fillBase(){
   const amt = parseNum($("#inAmount").value);
   const useKas = $("#useKas").checked;
-  const avail = Math.max(0, kasAvailable($("#inMonth").value));
+  const avail = Math.max(0, kasAvailable());
   return amt + (useKas ? avail : 0);
+}
+function updateMonthHint(){
+  const ym = $("#inMonth").value;
+  const el = $("#monthHint");
+  if(!el) return;
+  const e = ym ? S.entries.find(x=>x.month===ym) : null;
+  if(e){
+    el.style.display = "block";
+    el.textContent = "Bulan "+ymLabel(ym)+" sudah ada setoran "+fmt(e.total)+". Input baru akan ditambahkan, bukan menimpa.";
+  }else{
+    el.style.display = "none";
+  }
 }
 function updatePlanPreview(){
   const sp = planSplit(fillBase());
   INV_ASSETS.forEach(a=> $("#plan-"+a.k).textContent = "Rencana "+fmt(sp[a.k]));
+  updateMonthHint();
   updateSum();
 }
 function updateSum(){
   const amt = parseNum($("#inAmount").value);
   let s=0; INV_ASSETS.forEach(a=> s+=parseNum(splitInputs[a.k].value));
   $("#sumActual").textContent = fmt(s);
-  $("#kasAvail").textContent = fmt(Math.max(0, kasAvailable($("#inMonth").value)));
+  $("#kasAvail").textContent = fmt(Math.max(0, kasAvailable()));
 
   const delta = amt - s;
   const line = $("#kasFlowLine");
@@ -748,7 +825,7 @@ function updateSum(){
     flow.className = "ok";
   }else{
     const need = -delta;
-    const avail = Math.max(0, kasAvailable($("#inMonth").value));
+    const avail = Math.max(0, kasAvailable());
     line.firstElementChild.textContent = "Dipakai dari dana bebas";
     flow.textContent = fmt(need)+" (tersedia "+fmt(avail)+")";
     flow.className = need<=avail ? "ok" : "bad";
@@ -762,29 +839,34 @@ function saveEntry(){
   const ym = $("#inMonth").value;
   if(!ym){ toast("Pilih bulan dulu"); return; }
   const amt = parseNum($("#inAmount").value);
-  const actual = {}; let alokasi=0;
+  const actual = invZeroMap(); let alokasi=0;
   INV_ASSETS.forEach(a=>{ actual[a.k]=parseNum(splitInputs[a.k].value); alokasi+=actual[a.k]; });
   if(amt<=0 && alokasi<=0){ toast("Isi jumlah setoran atau alokasi ke aset"); return; }
   const kasDelta = amt - alokasi;
   if(kasDelta < 0){
-    const avail = Math.max(0, kasAvailable(ym));
+    const avail = Math.max(0, kasAvailable());
     if(-kasDelta > avail){
       toast("Dana bebas tidak cukup. Dipakai "+fmt(-kasDelta)+", tersedia "+fmt(avail));
       return;
     }
   }
-  const ix = S.entries.findIndex(e=>e.month===ym);
-  const entry = {id: ix>=0 ? S.entries[ix].id : Date.now(), month:ym, actual, total:amt, kas:kasDelta};
-  if(ix>=0){
-    if(!confirm("Setoran bulan "+ymLabel(ym)+" sudah ada. Timpa dengan data baru?")) return;
-    S.entries[ix] = entry;
+  const part = {id:Date.now()+Math.random(), amount:amt, actual, kas:kasDelta};
+  let entry = S.entries.find(e=>e.month===ym);
+  const merged = !!entry;
+  let totalBulan = amt;
+  if(entry){
+    // akumulasi sebagai setoran tambahan pada bulan yang sama, bukan menimpa
+    entry.parts.push(part); recomputeEntry(entry); totalBulan = entry.total;
   }else{
+    entry = recomputeEntry({id:Date.now(), month:ym, parts:[part]});
     S.entries.push(entry);
   }
   S.entries.sort((a,b)=> a.month<b.month?-1:1);
   save(); renderAll();
   $("#inAmount").value=""; fillInputs({}); updatePlanPreview();
-  let msg = "Setoran "+ymLabel(ym)+" tersimpan";
+  let msg = merged
+    ? "Ditambahkan ke setoran "+ymLabel(ym)+". Total setoran bulan ini "+fmt(totalBulan)
+    : "Setoran "+ymLabel(ym)+" tersimpan";
   if(kasDelta>0) msg += ". "+fmt(kasDelta)+" masuk dana bebas";
   else if(kasDelta<0) msg += ". "+fmt(-kasDelta)+" diambil dari dana bebas";
   toast(msg);
@@ -801,21 +883,44 @@ function renderHistory(){
     const kasTxt = e.kas>0 ? '+'+fmt(e.kas)+' ke dana bebas'
                  : e.kas<0 ? fmt(-e.kas)+' dari dana bebas' : '-';
     rows += '<div class="r2"><span>Dana bebas</span><span>'+kasTxt+'</span></div>';
+    const nParts = e.parts.length;
+    let partsHtml="";
+    if(nParts>1){
+      partsHtml = '<div class="r2" style="margin-top:8px;font-weight:600"><span>Rincian '+nParts+' setoran</span><span></span></div>';
+      e.parts.forEach((p,i)=>{
+        const pAlok = p.amount - p.kas;
+        partsHtml += '<div class="r2"><span>Setoran '+(i+1)+' · '+fmt(p.amount)+' (dialokasikan '+fmt(pAlok)+')</span>'+
+          '<span><button class="danger small" data-delpart="'+e.id+'~'+p.id+'">Hapus</button></span></div>';
+      });
+    }
     const alokasi = e.total - e.kas;
     det.innerHTML =
       '<summary><span class="l">'+ymLabel(e.month)+
-      '<small>Dialokasikan '+fmt(alokasi)+'</small></span>'+
+      '<small>Dialokasikan '+fmt(alokasi)+(nParts>1?' · '+nParts+'x setoran':'')+'</small></span>'+
       '<span class="r">'+fmt(e.total)+'<small>setoran</small></span></summary>'+
-      '<div class="detail">'+rows+
-      '<div class="btnrow"><button class="danger small" data-del="'+e.id+'">Hapus setoran ini</button></div></div>';
+      '<div class="detail">'+rows+partsHtml+
+      '<div class="btnrow"><button class="danger small" data-del="'+e.id+'">Hapus seluruh bulan ini</button></div></div>';
     box.appendChild(det);
   });
   box.querySelectorAll("[data-del]").forEach(b=>{
     b.addEventListener("click", ()=>{
       const id = Number(b.dataset.del);
       const e = S.entries.find(x=>x.id===id);
-      if(confirm("Hapus setoran "+ymLabel(e.month)+"?")){
+      if(confirm("Hapus seluruh setoran bulan "+ymLabel(e.month)+"?")){
         S.entries = S.entries.filter(x=>x.id!==id);
+        save(); renderAll(); toast("Setoran dihapus");
+      }
+    });
+  });
+  box.querySelectorAll("[data-delpart]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const [eid, pid] = b.dataset.delpart.split("~");
+      const e = S.entries.find(x=>String(x.id)===eid);
+      if(!e) return;
+      if(confirm("Hapus satu setoran ini dari bulan "+ymLabel(e.month)+"?")){
+        e.parts = e.parts.filter(p=>String(p.id)!==pid);
+        if(e.parts.length===0) S.entries = S.entries.filter(x=>x!==e);
+        else recomputeEntry(e);
         save(); renderAll(); toast("Setoran dihapus");
       }
     });
@@ -965,8 +1070,9 @@ function saveSl(){
 /* ---------- RIWAYAT TRANSAKSI ---------- */
 function renderTxns(){
   const box = $("#txnList"); box.innerHTML="";
-  if(!S.txns.length){ box.innerHTML='<p class="empty">Belum ada transaksi tercatat.</p>'; return; }
-  [...S.txns].sort((a,b)=> a.date<b.date?1:-1).forEach(t=>{
+  const visible = S.txns.filter(t=>t.type!=="matur");
+  if(!visible.length){ box.innerHTML='<p class="empty">Belum ada transaksi tercatat.</p>'; return; }
+  [...visible].sort((a,b)=> a.date<b.date?1:-1).forEach(t=>{
     const det = document.createElement("details");
     det.className="hitem";
     let title, amount, detail="";
@@ -998,11 +1104,20 @@ function renderTxns(){
   });
   box.querySelectorAll("[data-deltx]").forEach(b=>{
     b.addEventListener("click", ()=>{
-      const id = Number(b.dataset.deltx);
-      const t = S.txns.find(x=>x.id===id);
-      if(t && t.depoId && !confirm("Transaksi ini terkait deposito. Tetap hapus?")) return;
+      const id = b.dataset.deltx;
+      const t = S.txns.find(x=>String(x.id)===id);
+      if(!t) return;
+      if(t.depoId && t.type==="income"){
+        // bunga jatuh tempo: hapus juga pengembalian pokok dan aktifkan lagi depositonya
+        if(!confirm("Ini bunga deposito jatuh tempo. Menghapusnya mengembalikan status deposito ke aktif. Lanjut?")) return;
+        const dp = S.depos.find(d=>d.id===t.depoId); if(dp) dp.status="aktif";
+        S.txns = S.txns.filter(x=> !(x.depoId===t.depoId && (x.type==="matur" || String(x.id)===id)));
+        save(); renderAll(); toast("Bunga deposito dihapus, deposito kembali aktif");
+        return;
+      }
+      if(t.depoId && !confirm("Transaksi ini terkait deposito. Tetap hapus?")) return;
       if(confirm("Hapus transaksi ini?")){
-        S.txns = S.txns.filter(x=>x.id!==id);
+        S.txns = S.txns.filter(x=>String(x.id)!==id);
         save(); renderAll(); toast("Transaksi dihapus");
       }
     });
@@ -1154,6 +1269,8 @@ function importData(file){
       S.entries = (p.entries||[]).map(normalizeEntry);
       S.txns = Array.isArray(p.txns)?p.txns:[];
       S.depos = Array.isArray(p.depos)?p.depos:[];
+      if((p.v||1) < 4) migrateDepoTxns(S.txns, S.depos);
+      S.v = 4;
       save(); fillSettings(); renderAll(); toast("Data berhasil diimpor");
     }catch(e){ toast("File tidak valid"); }
   };
@@ -1180,7 +1297,7 @@ document.querySelectorAll("nav.tabs button").forEach(b=>
 
 buildSplitList(); buildSettings(); fillSettings();
 
-fillAssetSelect($("#dpSumber"), {extraFirst:true});
+fillAssetSelect($("#dpSumber"), {extraFirst:true, exclude:["depo"]});
 fillAssetSelect($("#pvAsset"), {incomeOnly:true});
 fillAssetSelect($("#pvTo"));
 fillAssetSelect($("#slAsset"));
