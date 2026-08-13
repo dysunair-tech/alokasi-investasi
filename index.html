@@ -16,7 +16,7 @@
 :root{
   --bg:#10151B; --surface:#191F27; --surface2:#202A36; --border:#2B3542;
   --text:#E9EDF2; --muted:#8C97A6; --gold:#E4B54A;
-  --idx:#5B8DEF; --etf:#9B7BE4; --sbn:#47BE8A; --depo:#E48A4F; --rdpu:#43B7C9; --emas:#E4B54A; --kas:#8C97A6;
+  --idx:#5B8DEF; --etf:#9B7BE4; --sbn:#47BE8A; --depo:#E48A4F; --valas:#4FC1E4; --rdpu:#43B7C9; --emas:#E4B54A; --kas:#8C97A6;
   --pos:#47BE8A; --neg:#E4574F;
   --radius:14px;
   --font:'Space Grotesk',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
@@ -201,6 +201,7 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
       <div class="row"><span class="k">Setoran pokok</span><span class="v" id="vKontribusi">Rp0</span></div>
       <div class="row"><span class="k">Pendapatan pasif (neto pajak)</span><span class="v pos" id="vPasif">Rp0</span></div>
       <div class="row"><span class="k">Untung / rugi jual aset (neto)</span><span class="v" id="vPL">Rp0</span></div>
+      <div class="row" id="vValasRow" style="display:none"><span class="k">Selisih nilai valas (belum terealisasi)</span><span class="v" id="vValas">Rp0</span></div>
       <div class="row"><span class="k">Dana bebas (belum dialokasikan)</span><span class="v" id="vKas">Rp0</span></div>
     </div>
     <hr class="sep">
@@ -287,7 +288,41 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
     <div class="calcline"><span class="k">Pajak (<span id="dpTaxPct">20</span>%)</span><b id="dpTax">Rp0</b></div>
     <div class="calcline"><span class="k">Bunga neto diterima</span><b class="pos" id="dpNeto">Rp0</b></div>
     <div class="btnrow"><button class="primary" id="btnDepoSave">Simpan deposito</button></div>
-    <p class="note">Saat jatuh tempo, bunga neto otomatis dicatat sebagai pendapatan pasif dan pokok tetap di saldo Deposito. Pindahkan lewat form Jual / Alihkan jika ingin ke aset lain.</p>
+    <p class="note">Saat jatuh tempo, pokok dan bunga neto otomatis kembali ke Dana Bebas dan bunga tercatat sebagai pendapatan pasif.</p>
+  </div>
+
+  <div class="card">
+    <h2>Valas</h2>
+    <div id="valasSummaryBox"></div>
+    <div id="valasList"></div>
+    <hr class="sep">
+    <div class="seg" style="margin-bottom:4px">
+      <button id="vsBuy" class="on" data-mode="buy">Beli valas</button>
+      <button id="vsSell" data-mode="sell">Jual valas</button>
+    </div>
+    <div class="grid2">
+      <div>
+        <label class="f" for="vlCcy">Mata uang</label>
+        <input type="text" id="vlCcy" list="ccyList" placeholder="USD" autocapitalize="characters">
+        <datalist id="ccyList"></datalist>
+      </div>
+      <div>
+        <label class="f" for="vlUnits">Jumlah (unit)</label>
+        <input type="text" id="vlUnits" inputmode="decimal" placeholder="1.000">
+      </div>
+    </div>
+    <label class="f" for="vlRate"><span id="vlRateLbl">Kurs beli</span> (IDR per 1 unit)</label>
+    <div class="inrow"><span class="pre">Rp</span>
+      <input type="text" id="vlRate" inputmode="numeric" placeholder="16.250">
+    </div>
+    <label class="f" for="vlDate">Tanggal</label>
+    <input type="date" id="vlDate">
+    <label class="f" for="vlFund"><span id="vlFundLbl">Sumber dana</span></label>
+    <select id="vlFund"></select>
+    <div class="calcline"><span class="k">Nilai transaksi</span><b id="vlValue">Rp0</b></div>
+    <div class="calcline" id="vlPlLine" style="display:none"><span class="k">Untung / rugi realisasi</span><b id="vlPl">Rp0</b></div>
+    <div class="btnrow"><button class="primary" id="btnVlSave">Simpan transaksi valas</button></div>
+    <p class="note">Nilai valas di beranda dihitung dari kurs terkini (mark-to-market), bukan kurs beli. Perbarui kurs terkini tiap mata uang di daftar atas agar keuntungan berjalan akurat.</p>
   </div>
 
   <div class="card">
@@ -457,17 +492,22 @@ hr.sep{border:none; border-top:1px solid var(--border); margin:16px 0}
 "use strict";
 /* ---------- konstanta ---------- */
 const INV_ASSETS = [
-  {k:"idx",  n:"Saham IDX",          c:"var(--idx)",  income:"Dividen saham IDX"},
-  {k:"etf",  n:"ETF Ekuitas Global", c:"var(--etf)",  income:"Dividen ETF global"},
-  {k:"sbn",  n:"SBN Ritel",          c:"var(--sbn)",  income:"Kupon SBN"},
-  {k:"depo", n:"Deposito",           c:"var(--depo)", income:"Bunga deposito (manual)"},
-  {k:"rdpu", n:"Pasar Uang / RDPU",  c:"var(--rdpu)", income:"Imbal hasil RDPU"},
-  {k:"emas", n:"Emas",               c:"var(--emas)", income:null}
+  {k:"idx",   n:"Saham IDX",          c:"var(--idx)",   income:"Dividen saham IDX"},
+  {k:"etf",   n:"ETF Ekuitas Global", c:"var(--etf)",   income:"Dividen ETF global"},
+  {k:"sbn",   n:"SBN Ritel",          c:"var(--sbn)",   income:"Kupon SBN"},
+  {k:"depo",  n:"Deposito",           c:"var(--depo)",  income:"Bunga deposito (manual)"},
+  {k:"valas", n:"Valas",              c:"var(--valas)", income:null},
+  {k:"rdpu",  n:"Pasar Uang / RDPU",  c:"var(--rdpu)",  income:"Imbal hasil RDPU"},
+  {k:"emas",  n:"Emas",               c:"var(--emas)",  income:null}
 ];
 const KAS = {k:"kas", n:"Dana Bebas", c:"var(--kas)", income:null};
 const ALL_ASSETS = [...INV_ASSETS, KAS];
 const A = {}; ALL_ASSETS.forEach(a=>A[a.k]=a);
-const DEFAULT_ALLOC = {idx:38, etf:30, sbn:15, depo:7, rdpu:5, emas:5};
+// aset yang diisi manual sebagai rupiah pada pembagian setoran (valas dikelola lewat form khusus)
+const SPLIT_ASSETS = INV_ASSETS.filter(a=>a.k!=="valas");
+const DEFAULT_ALLOC = {idx:35, etf:28, sbn:15, depo:7, valas:5, rdpu:5, emas:5};
+const OLD_DEFAULT_ALLOC = {idx:38, etf:30, sbn:15, depo:7, rdpu:5, emas:5};
+const COMMON_CCY = ["USD","SGD","CNY","EUR","JPY","AUD","GBP","HKD","MYR","SAR"];
 const DEFAULT_TAX = {idx:10, etf:15, sbn:10, depo:20, rdpu:0};
 const TAX_LABELS = {idx:"Dividen saham IDX", etf:"Dividen ETF global", sbn:"Kupon SBN", depo:"Bunga deposito", rdpu:"Imbal hasil RDPU"};
 const LS_KEY = "alokasiInvestasiV2";
@@ -480,9 +520,9 @@ function invZeroMap(){ const o={}; INV_ASSETS.forEach(a=>o[a.k]=0); return o; }
 function defaultState(){
   const d = new Date();
   const ym = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
-  return {v:4, target:2000000000, years:10, start:ym,
+  return {v:6, target:2000000000, years:10, start:ym,
     alloc:{...DEFAULT_ALLOC}, tax:{...DEFAULT_TAX},
-    saldoAwal:zeroMap(), entries:[], txns:[], depos:[]};
+    saldoAwal:zeroMap(), entries:[], txns:[], depos:[], valasRate:{}};
 }
 function recomputeEntry(e){
   const actual = invZeroMap();
@@ -580,7 +620,22 @@ function load(){
         }
       });
     }
-    st.v = 4;
+    // migrasi v6: tambahkan aset valas ke alokasi dan siapkan kurs valas
+    if(!st.valasRate || typeof st.valasRate!=="object") st.valasRate = {};
+    if((p.v||1) < 6){
+      const cur = p.alloc || {};
+      // cek apakah alokasi lama persis default lama, jika ya pakai rekomendasi baru bervalas
+      const samaDefaultLama = Object.keys(OLD_DEFAULT_ALLOC).every(k=> Number(cur[k])===OLD_DEFAULT_ALLOC[k])
+        && !("valas" in cur);
+      if(samaDefaultLama){
+        st.alloc = {...DEFAULT_ALLOC};
+      }else if(!("valas" in cur)){
+        st.alloc.valas = 0; // pertahankan total 100% milik pengguna, valas bisa diatur sendiri
+      }
+    }
+    if(!("valas" in st.alloc)) st.alloc.valas = 0;
+    delete st.saldoAwal.valas; // valas dikelola lewat posisi, bukan saldo awal rupiah
+    st.v = 6;
     return st;
   }catch(e){ return defaultState(); }
 }
@@ -638,11 +693,42 @@ function fillAssetSelect(sel, opts){
 }
 
 /* ---------- perhitungan inti ---------- */
+function valasSummary(){
+  // proses kronologis transaksi valas dengan metode harga rata-rata
+  const list = S.txns.filter(t=>t.type==="valasbuy"||t.type==="valassell")
+                     .slice().sort((a,b)=> (a.date<b.date?-1:a.date>b.date?1:0));
+  const pos = {}; let realized = 0;
+  list.forEach(t=>{
+    const c = t.ccy;
+    if(!pos[c]) pos[c] = {units:0, avgRate:0};
+    const p = pos[c];
+    if(t.type==="valasbuy"){
+      const nu = p.units + t.units;
+      p.avgRate = nu>0 ? (p.units*p.avgRate + t.units*t.rate)/nu : 0;
+      p.units = nu;
+    }else{
+      const su = Math.min(t.units, p.units);
+      realized += su*(t.rate - p.avgRate);
+      p.units -= su;
+      if(p.units < 1e-9) p.units = 0;
+    }
+  });
+  const byCcy = {}; let totalCost=0, totalMarket=0;
+  Object.keys(pos).forEach(c=>{
+    const p = pos[c];
+    if(p.units < 1e-9) return;
+    const cur = (S.valasRate[c] && S.valasRate[c]>0) ? S.valasRate[c] : p.avgRate;
+    const cost = p.units*p.avgRate, market = p.units*cur;
+    byCcy[c] = {units:p.units, avgRate:p.avgRate, curRate:cur, cost, market, pl:market-cost};
+    totalCost += cost; totalMarket += market;
+  });
+  return {byCcy, totalCost, totalMarket, totalPL:totalMarket-totalCost, realized};
+}
 function holdings(){
   const h = zeroMap();
-  ALL_ASSETS.forEach(a=> h[a.k] += S.saldoAwal[a.k]||0);
+  ALL_ASSETS.forEach(a=> { if(a.k!=="valas") h[a.k] += S.saldoAwal[a.k]||0; });
   S.entries.forEach(e=>{
-    INV_ASSETS.forEach(a=> h[a.k] += e.actual[a.k]||0);
+    SPLIT_ASSETS.forEach(a=> h[a.k] += e.actual[a.k]||0);
     h.kas += e.kas||0;
   });
   S.txns.forEach(t=>{
@@ -654,18 +740,24 @@ function holdings(){
     }
     else if(t.type==="matur"){ h.depo -= t.pokok; h[t.toAsset||"kas"] += t.pokok; }
     else if(t.type==="adjust"){ h[t.toAsset||"kas"] += t.net; }
+    else if(t.type==="valasbuy"){ if(t.source!=="__baru") h[t.source] -= (t.units*t.rate); }
+    else if(t.type==="valassell"){ h[t.dest||"kas"] += (t.units*t.rate); }
   });
+  // valas dinilai berdasarkan kurs terkini (mark-to-market)
+  h.valas = valasSummary().totalMarket;
   return h;
 }
 function totals(){
   let kontribusi = 0, pasif = 0, pl = 0;
-  ALL_ASSETS.forEach(a=> kontribusi += S.saldoAwal[a.k]||0);
+  ALL_ASSETS.forEach(a=> { if(a.k!=="valas") kontribusi += S.saldoAwal[a.k]||0; });
   S.entries.forEach(e=> kontribusi += e.total);
   S.txns.forEach(t=>{
     if(t.type==="income") pasif += t.net;
     else if(t.type==="jual") pl += t.pl;
     else if(t.type==="depo" && t.asset==="__baru") kontribusi += t.gross;
+    else if(t.type==="valasbuy" && t.source==="__baru") kontribusi += (t.units*t.rate);
   });
+  pl += valasSummary().realized; // untung/rugi valas yang sudah terealisasi
   return {kontribusi, pasif, pl};
 }
 function totalNow(){ const h=holdings(); return ALL_ASSETS.reduce((s,a)=>s+h[a.k],0); }
@@ -755,6 +847,16 @@ function renderHome(){
   plEl.textContent = fmtS(pl);
   plEl.className = "v "+(pl>0?"pos":pl<0?"neg":"");
   $("#vKas").textContent = fmt(h.kas);
+  const vUnreal = valasSummary().totalPL;
+  const vRow = $("#vValasRow");
+  if(Math.abs(vUnreal) >= 1){
+    vRow.style.display = "flex";
+    const vEl = $("#vValas");
+    vEl.textContent = fmtS(vUnreal);
+    vEl.className = "v "+(vUnreal>0?"pos":vUnreal<0?"neg":"");
+  }else{
+    vRow.style.display = "none";
+  }
   const pasifBln = pasif/Math.max(1,nM);
   $("#vPasifBln").textContent = "+"+fmt(pasifBln);
   $("#vNeedNet").textContent = fmt(Math.max(0, need-pasifBln));
@@ -796,6 +898,14 @@ function buildSplitList(){
   INV_ASSETS.forEach(a=>{
     const row = document.createElement("div");
     row.className = "splitrow";
+    if(a.k==="valas"){
+      row.innerHTML =
+        '<div class="head"><span class="name"><span class="dot" style="background:'+a.c+';display:inline-block;margin-right:7px"></span><b>'+a.n+'</b></span>'+
+        '<span class="plan" id="plan-'+a.k+'">Rencana Rp0</span></div>'+
+        '<div class="note" style="margin-top:4px">Beli valas dicatat lewat form Valas di tab Transaksi. Sisihkan porsi ini di dana bebas lalu belanjakan di sana.</div>';
+      box.appendChild(row);
+      return;
+    }
     row.innerHTML =
       '<div class="head"><span class="name"><span class="dot" style="background:'+a.c+';display:inline-block;margin-right:7px"></span><b>'+a.n+'</b></span>'+
       '<span class="plan" id="plan-'+a.k+'">Rencana Rp0</span></div>';
@@ -835,7 +945,7 @@ function updatePlanPreview(){
 }
 function updateSum(){
   const amt = parseNum($("#inAmount").value);
-  let s=0; INV_ASSETS.forEach(a=> s+=parseNum(splitInputs[a.k].value));
+  let s=0; SPLIT_ASSETS.forEach(a=> s+=parseNum(splitInputs[a.k].value));
   $("#sumActual").textContent = fmt(s);
   $("#kasAvail").textContent = fmt(Math.max(0, kasAvailable()));
 
@@ -855,7 +965,7 @@ function updateSum(){
   }
 }
 function fillInputs(map){
-  INV_ASSETS.forEach(a=> splitInputs[a.k].value = map[a.k]?map[a.k].toLocaleString("id-ID"):"");
+  SPLIT_ASSETS.forEach(a=> splitInputs[a.k].value = map[a.k]?map[a.k].toLocaleString("id-ID"):"");
   updateSum();
 }
 function saveEntry(){
@@ -863,7 +973,7 @@ function saveEntry(){
   if(!ym){ toast("Pilih bulan dulu"); return; }
   const amt = parseNum($("#inAmount").value);
   const actual = invZeroMap(); let alokasi=0;
-  INV_ASSETS.forEach(a=>{ actual[a.k]=parseNum(splitInputs[a.k].value); alokasi+=actual[a.k]; });
+  SPLIT_ASSETS.forEach(a=>{ actual[a.k]=parseNum(splitInputs[a.k].value); alokasi+=actual[a.k]; });
   if(amt<=0 && alokasi<=0){ toast("Isi jumlah setoran atau alokasi ke aset"); return; }
   const kasDelta = amt - alokasi;
   if(kasDelta < 0){
@@ -1025,6 +1135,121 @@ function renderDepos(){
   });
 }
 
+/* ---------- VALAS ---------- */
+function parseUnits(v){ return parseFloat(String(v).replace(/\./g,"").replace(",",".")) || 0; }
+function fmtU(n){ return (Math.round(n*10000)/10000).toLocaleString("id-ID",{maximumFractionDigits:4}); }
+function fmtRate(n){ return "Rp"+Math.round(n).toLocaleString("id-ID"); }
+let valasMode = "buy";
+function renderValas(){
+  const vs = valasSummary();
+  const sb = $("#valasSummaryBox");
+  const ccys = Object.keys(vs.byCcy).sort();
+  if(!ccys.length){
+    sb.innerHTML = '<p class="empty">Belum ada posisi valas. Catat pembelian di bawah.</p>';
+    $("#valasList").innerHTML = "";
+  }else{
+    sb.innerHTML =
+      '<div class="tstats">'+
+      '<div class="row"><span class="k">Nilai kini (kurs terakhir)</span><span class="v">'+fmt(vs.totalMarket)+'</span></div>'+
+      '<div class="row"><span class="k">Modal (kurs beli rata-rata)</span><span class="v">'+fmt(vs.totalCost)+'</span></div>'+
+      '<div class="row"><span class="k">Untung/rugi belum terealisasi</span><span class="v '+(vs.totalPL>=0?"pos":"neg")+'">'+fmtS(vs.totalPL)+'</span></div>'+
+      (Math.abs(vs.realized)>=1? '<div class="row"><span class="k">Untung/rugi terealisasi</span><span class="v '+(vs.realized>=0?"pos":"neg")+'">'+fmtS(vs.realized)+'</span></div>':'')+
+      '</div>';
+    const box = $("#valasList"); box.innerHTML="";
+    ccys.forEach(c=>{
+      const p = vs.byCcy[c];
+      const det = document.createElement("details");
+      det.className="hitem";
+      det.innerHTML =
+        '<summary><span class="l">'+c+'<small>'+fmtU(p.units)+' unit · beli '+fmtRate(p.avgRate)+'</small></span>'+
+        '<span class="r">'+fmt(p.market)+'<small class="'+(p.pl>=0?"pl-pos":"pl-neg")+'">'+fmtS(p.pl)+'</small></span></summary>'+
+        '<div class="detail">'+
+        '<div class="r2"><span>Kurs beli rata-rata</span><span>'+fmtRate(p.avgRate)+'</span></div>'+
+        '<div class="r2"><span>Modal</span><span>'+fmt(p.cost)+'</span></div>'+
+        '<div class="r2"><span>Nilai kini</span><span>'+fmt(p.market)+'</span></div>'+
+        '<div class="r2"><span>Untung/rugi</span><span class="'+(p.pl>=0?"pl-pos":"pl-neg")+'">'+fmtS(p.pl)+'</span></div>'+
+        '<label class="f" style="margin-top:6px">Kurs terkini '+c+' (IDR per 1 unit)</label>'+
+        '<div class="inrow"><span class="pre">Rp</span><input type="text" inputmode="numeric" class="vrate" data-ccy="'+c+'" value="'+Math.round(p.curRate).toLocaleString("id-ID")+'"></div>'+
+        '</div>';
+      box.appendChild(det);
+    });
+    box.querySelectorAll(".vrate").forEach(inp=>{
+      inp.addEventListener("input", ()=>{ const n=parseNum(inp.value); inp.value=n?n.toLocaleString("id-ID"):""; });
+      inp.addEventListener("change", ()=>{
+        const c=inp.dataset.ccy, n=parseNum(inp.value);
+        if(n>0){ S.valasRate[c]=n; save(); renderAll(); toast("Kurs "+c+" diperbarui"); }
+      });
+    });
+  }
+  // isi datalist mata uang umum
+  const dl = $("#ccyList");
+  if(dl && !dl.dataset.filled){ dl.innerHTML = COMMON_CCY.map(c=>'<option value="'+c+'">').join(""); dl.dataset.filled="1"; }
+}
+function updateValasPreview(){
+  const units = parseUnits($("#vlUnits").value);
+  const rate = parseNum($("#vlRate").value);
+  $("#vlValue").textContent = fmt(units*rate);
+  if(valasMode==="sell"){
+    const c = $("#vlCcy").value.trim().toUpperCase();
+    const vs = valasSummary().byCcy[c];
+    const avg = vs?vs.avgRate:0;
+    const pl = units*(rate-avg);
+    $("#vlPlLine").style.display = "flex";
+    const el = $("#vlPl"); el.textContent = fmtS(pl); el.className = pl>=0?"pos":"neg";
+  }else{
+    $("#vlPlLine").style.display = "none";
+  }
+}
+function setValasMode(m){
+  valasMode = m;
+  $("#vsBuy").classList.toggle("on", m==="buy");
+  $("#vsSell").classList.toggle("on", m==="sell");
+  $("#vlRateLbl").textContent = m==="buy" ? "Kurs beli" : "Kurs jual";
+  $("#vlFundLbl").textContent = m==="buy" ? "Sumber dana" : "Dana masuk ke";
+  const sel = $("#vlFund"); sel.innerHTML="";
+  if(m==="buy"){
+    // sumber dibatasi ke dana baru atau dana bebas agar untung rugi aset lain tetap tercatat lewat form Jual
+    [["__baru","Dana baru (di luar setoran bulanan)"],["kas","Dana Bebas"]].forEach(([v,t])=>{
+      const o=document.createElement("option"); o.value=v; o.textContent=t; sel.appendChild(o);
+    });
+    sel.value="kas";
+  }else{
+    fillAssetSelect(sel, {exclude:["valas"]});
+    sel.value="kas";
+  }
+  updateValasPreview();
+}
+function saveValas(){
+  const c = $("#vlCcy").value.trim().toUpperCase();
+  const units = parseUnits($("#vlUnits").value);
+  const rate = parseNum($("#vlRate").value);
+  const date = $("#vlDate").value || todayISO();
+  const fund = $("#vlFund").value;
+  if(!c){ toast("Isi kode mata uang"); return; }
+  if(units<=0 || rate<=0){ toast("Isi jumlah unit dan kurs"); return; }
+  const val = units*rate;
+  if(valasMode==="buy"){
+    if(fund!=="__baru"){
+      const h = holdings();
+      if(h[fund] < val){ toast("Saldo "+A[fund].n+" tidak cukup ("+fmt(h[fund])+")"); return; }
+    }
+    S.txns.push({id:Date.now()+Math.random(), date, type:"valasbuy", ccy:c, units, rate, source:fund,
+      note:"Beli "+fmtU(units)+" "+c+" @ "+fmtRate(rate)});
+    if(!S.valasRate[c] || S.valasRate[c]<=0) S.valasRate[c]=rate;
+  }else{
+    const vs = valasSummary().byCcy[c];
+    if(!vs || vs.units < units-1e-9){ toast("Unit "+c+" tidak cukup (punya "+(vs?fmtU(vs.units):"0")+")"); return; }
+    S.txns.push({id:Date.now()+Math.random(), date, type:"valassell", ccy:c, units, rate, dest:fund,
+      note:"Jual "+fmtU(units)+" "+c+" @ "+fmtRate(rate)});
+    S.valasRate[c]=rate;
+  }
+  save(); renderAll();
+  ["vlCcy","vlUnits","vlRate"].forEach(i=>$("#"+i).value="");
+  $("#vlDate").value = todayISO();
+  updateValasPreview();
+  toast("Transaksi valas tersimpan");
+}
+
 /* ---------- PENDAPATAN PASIF ---------- */
 function updatePvPreview(){
   const g = parseNum($("#pvGross").value);
@@ -1174,6 +1399,18 @@ function renderTxns(){
       title = t.note || "Penyesuaian dana bebas";
       amount = '<span class="'+(t.net>=0?"pl-pos":"pl-neg")+'">'+fmtS(t.net)+'</span>';
       detail = '<div class="r2"><span>Sasaran</span><span>Dana Bebas</span></div>';
+    }else if(t.type==="valasbuy"){
+      title = t.note; amount = '<span class="pl-neg">-'+fmt(t.units*t.rate)+'</span>';
+      detail =
+        '<div class="r2"><span>Jumlah</span><span>'+fmtU(t.units)+' '+t.ccy+'</span></div>'+
+        '<div class="r2"><span>Kurs beli</span><span>'+fmtRate(t.rate)+'</span></div>'+
+        '<div class="r2"><span>Sumber dana</span><span>'+(t.source==="__baru"?"Dana baru":A[t.source].n)+'</span></div>';
+    }else if(t.type==="valassell"){
+      title = t.note; amount = '<span class="pl-pos">+'+fmt(t.units*t.rate)+'</span>';
+      detail =
+        '<div class="r2"><span>Jumlah</span><span>'+fmtU(t.units)+' '+t.ccy+'</span></div>'+
+        '<div class="r2"><span>Kurs jual</span><span>'+fmtRate(t.rate)+'</span></div>'+
+        '<div class="r2"><span>Dana masuk ke</span><span>'+A[t.dest||"kas"].n+'</span></div>';
     }else{
       title = t.note;
       amount = fmt(t.gross);
@@ -1284,6 +1521,7 @@ function buildSettings(){
   });
   const se = $("#saldoEditor"); se.innerHTML=""; saldoInputs={};
   ALL_ASSETS.forEach(a=>{
+    if(a.k==="valas") return; // valas dikelola lewat posisi mata uang
     const lab = document.createElement("label");
     lab.className="f"; lab.textContent = a.k==="kas" ? "Dana Bebas (kas menganggur)" : a.n;
     const wrap = document.createElement("div");
@@ -1302,6 +1540,7 @@ function fillSettings(){
   $("#setStart").value = S.start;
   INV_ASSETS.forEach(a=>{ allocInputs[a.k].value = S.alloc[a.k]; });
   ALL_ASSETS.forEach(a=>{
+    if(!saldoInputs[a.k]) return;
     saldoInputs[a.k].value = S.saldoAwal[a.k]?S.saldoAwal[a.k].toLocaleString("id-ID"):"";
   });
   Object.keys(DEFAULT_TAX).forEach(k=> taxInputs[k].value = S.tax[k]);
@@ -1326,7 +1565,7 @@ function saveSettings(){
   S.target=t; S.years=y;
   S.start = $("#setStart").value || S.start;
   INV_ASSETS.forEach(a=>{ S.alloc[a.k]=parseDec(allocInputs[a.k].value); });
-  ALL_ASSETS.forEach(a=>{ S.saldoAwal[a.k]=parseNum(saldoInputs[a.k].value); });
+  ALL_ASSETS.forEach(a=>{ if(saldoInputs[a.k]) S.saldoAwal[a.k]=parseNum(saldoInputs[a.k].value); });
   Object.keys(DEFAULT_TAX).forEach(k=> S.tax[k]=parseDec(taxInputs[k].value));
   save(); renderAll(); updateDepoPreview(); syncPvTax(); updateSum();
   toast("Pengaturan tersimpan");
@@ -1347,14 +1586,17 @@ function importData(file){
       S = {...defaultState(), ...p,
         alloc:{...invZeroMap(), ...p.alloc},
         tax:{...DEFAULT_TAX, ...(p.tax||{})},
-        saldoAwal:{...zeroMap(), ...(p.saldoAwal||{})}};
+        saldoAwal:{...zeroMap(), ...(p.saldoAwal||{})},
+        valasRate:(p.valasRate && typeof p.valasRate==="object") ? p.valasRate : {}};
       if(!("depo" in (p.alloc||{}))) S.alloc.depo = 0;
+      if(!("valas" in (p.alloc||{}))) S.alloc.valas = 0;
       delete S.alloc.kas;
+      delete S.saldoAwal.valas;
       S.entries = (p.entries||[]).map(normalizeEntry);
       S.txns = Array.isArray(p.txns)?p.txns:[];
       S.depos = Array.isArray(p.depos)?p.depos:[];
       if((p.v||1) < 4) migrateDepoTxns(S.txns, S.depos);
-      S.v = 4;
+      S.v = 6;
       save(); fillSettings(); renderAll(); toast("Data berhasil diimpor");
     }catch(e){ toast("File tidak valid"); }
   };
@@ -1369,7 +1611,7 @@ function switchPage(p){
     b.classList.toggle("on", b.dataset.page===p));
   window.scrollTo({top:0});
 }
-function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderTxns(); renderAnalysis(); updateSum(); if(typeof updateKasPreview==="function") updateKasPreview(); }
+function renderAll(){ renderHome(); renderHistory(); renderDepos(); renderValas(); renderTxns(); renderAnalysis(); updateSum(); if(typeof updateKasPreview==="function") updateKasPreview(); }
 function syncPvTax(){
   const a = $("#pvAsset").value;
   $("#pvTax").value = (S.tax[a] ?? 0);
@@ -1381,11 +1623,11 @@ document.querySelectorAll("nav.tabs button").forEach(b=>
 
 buildSplitList(); buildSettings(); fillSettings();
 
-fillAssetSelect($("#dpSumber"), {extraFirst:true, exclude:["depo"]});
+fillAssetSelect($("#dpSumber"), {extraFirst:true, exclude:["depo","valas"]});
 fillAssetSelect($("#pvAsset"), {incomeOnly:true});
-fillAssetSelect($("#pvTo"));
-fillAssetSelect($("#slAsset"));
-fillAssetSelect($("#slTo"));
+fillAssetSelect($("#pvTo"), {exclude:["valas"]});
+fillAssetSelect($("#slAsset"), {exclude:["valas"]});
+fillAssetSelect($("#slTo"), {exclude:["valas"]});
 $("#slTo").value = "kas";
 
 const now = new Date();
@@ -1394,6 +1636,8 @@ $("#hdrmonth").textContent = ymLabel($("#inMonth").value);
 $("#dpStart").value = todayISO();
 $("#pvDate").value = todayISO();
 $("#slDate").value = todayISO();
+$("#vlDate").value = todayISO();
+setValasMode("buy");
 
 bindMoney($("#inAmount"), updatePlanPreview);
 $("#inMonth").addEventListener("input", updatePlanPreview);
@@ -1416,6 +1660,12 @@ bindMoney($("#slBasis"), prefillSaleTax);
 bindMoney($("#slGross"), prefillSaleTax);
 bindMoney($("#slTax"), updateSlPreview);
 $("#slAsset").addEventListener("change", prefillSaleTax);
+$("#vlUnits").addEventListener("input", updateValasPreview);
+bindMoney($("#vlRate"), updateValasPreview);
+$("#vlCcy").addEventListener("input", ()=>{ const el=$("#vlCcy"); el.value=el.value.toUpperCase(); updateValasPreview(); });
+$("#vsBuy").addEventListener("click", ()=>setValasMode("buy"));
+$("#vsSell").addEventListener("click", ()=>setValasMode("sell"));
+$("#btnVlSave").addEventListener("click", saveValas);
 
 $("#btnFillPlan").addEventListener("click", ()=>{
   const base = fillBase();
